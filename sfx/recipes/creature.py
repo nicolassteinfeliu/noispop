@@ -20,7 +20,9 @@ Design notes (foley thinking, layer by layer):
   * Geese: per-bird wingbeat whuffs + feather rustle (3-4 Hz, own phase/rate drift), distance envelope
     over a staggered V; sparse far honks (polyBLEP pulse with rise-fall contour peaking on a key note,
     formants 1 / 2.5 kHz, light tanh) in a valley space; optional muffling by the sunroof glass.
-  * Sparrows: FM sweeps 4-7 kHz (cheep / down / up / trill) in short phrases, placed in a street space.
+  * Sparrows: FM sweeps 4-7 kHz (cheep / down / up / chevron / trill) with syrinx flutter, 2nd harmonic,
+    occasional second syrinx voice and breath noise, in short phrases (a bird mostly repeats its own call),
+    2-3 birds spread across the street space.
   * Hygiene: 120 Hz 24 dB/oct high-pass by default, 70 Hz on intentional bodies/thuds; fades >= 3 ms;
     all randomness from `rng`; sync offsets exact (steps: first contact; glass: contact transient).
 """
@@ -1032,6 +1034,8 @@ AUDITIONS = [
      "steps_dry_seed1", 1),
     ("cre.panda_steps", 0.9, {"steps": 3, "gait_s": 0.28, "surface": "wet_asphalt", "distance": "mid"}, 6.63, -10.0,
      "steps_wet_headlights", 0),
+    ("cre.panda_steps", 0.9, {"steps": 3, "gait_s": 0.28, "surface": "wet_asphalt", "body_db": -6.0}, 6.63, -6.0,
+     "steps_wet_headlights_thin", 0),
     ("cre.panda_steps", 1.6, {"step_times": [0.0, 0.27, 0.61, 0.86, 1.2], "surface": "wet_asphalt",
                               "distance": "close"}, None, None, "steps_wet_close_times", 2),
     ("cre.panda_breath", 0.6, {"type": "exhale", "close": True}, 10.4, -8.0, "breath_exhale_close", 0),
@@ -1041,6 +1045,8 @@ AUDITIONS = [
     ("cre.panda_breath", 0.6, {"type": "huff", "close": False}, None, None, "breath_huff_far", 3),
     ("cre.paw_on_glass", 1.2, {"press_ms": 220, "squeak": 0.4, "sniff": True, "inside": True}, 7.6, -10.0,
      "paw_glass_inside", 0),
+    ("cre.paw_on_glass", 1.2, {"press_ms": 220, "squeak": 0.4, "sniff": True, "inside": True, "body_db": -4.0},
+     7.6, -4.0, "paw_glass_hero", 0),
     ("cre.paw_on_glass", 1.2, {"press_ms": 300, "squeak": 0.7, "sniff": True, "inside": True}, None, None,
      "paw_glass_seed1", 1),
     ("cre.panda_crowd", 2.6, {"density": 0.5, "distance": "mid"}, 8.13, -16.0, "crowd_mid", 0),

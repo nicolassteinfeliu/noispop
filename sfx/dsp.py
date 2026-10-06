@@ -548,21 +548,27 @@ def make_ir(rt60_low: float, rt60_mid: float, rt60_high: float, rng, *, predelay
     pre = int(predelay_ms * 1e-3 * SR)
     chans = []
     shared = rng.standard_normal(n)
+    m = n - pre
+    nper, hop = 1024, 256
+    shared = rng.standard_normal(m + nper)
     for ch in range(2):
-        own = rng.standard_normal(n)
-        nz = np.sqrt(corr) * shared + np.sqrt(1 - corr) * own
-        lo = lp(nz, 400, 2)
-        mid = bp(nz, 400, 4000, 2)
-        hi = hp(nz, 4000, 2)
-        tail = (lo * np.exp(-6.91 * t / max(rt60_low, 0.01)) +
-                mid * np.exp(-6.91 * t / max(rt60_mid, 0.01)) +
-                hi * np.exp(-6.91 * t / max(rt60_high, 0.01)))
-        # entrada suave de la cola (tiempo de mezcla)
+        nz = np.sqrt(corr) * shared + np.sqrt(1 - corr) * rng.standard_normal(m + nper)
+        # decaimiento dependiente de la frecuencia aplicado en STFT (RT interpolado en log-f):
+        # sin bandas de crossover, así la cola no tiene muescas espectrales
+        f, tt, Z = signal.stft(nz, SR, nperseg=nper, noverlap=nper - hop)
+        lf = np.log2(np.maximum(f, 30.0))
+        rt = np.interp(lf, np.log2([150.0, 600.0, 2500.0, 7000.0, 18000.0]),
+                       [rt60_low, 0.5 * (rt60_low + rt60_mid), rt60_mid, rt60_high, 0.7 * rt60_high])
+        G = np.exp(-6.91 * tt[None, :] / np.maximum(rt[:, None], 0.01)) / np.sqrt(1.0 + (f[:, None] / 14000.0) ** 2)
+        _, tail = signal.istft(Z * G, SR, nperseg=nper, noverlap=nper - hop)
+        tail = pad_to(tail, m)
+        t = np.arange(m) / SR
         mix_t = 0.012 + 0.02 * rt60_mid
         tail *= np.clip(t / mix_t, 0, 1) ** 1.5
         if density_ms:
-            sparse = velvet(n, rng, 1000.0 / density_ms) * np.exp(-6.91 * t / max(rt60_mid, 0.01))
-            tail = 0.6 * tail + 0.8 * lp(sparse, 6000, 2)
+            sparse = velvet(m, rng, 1000.0 / density_ms) * np.exp(-6.91 * t / max(rt60_mid, 0.01))
+            tail = 0.6 * tail / (np.std(tail) + 1e-12) * np.std(sparse) + 0.8 * lp(sparse, 6000, 2)
+        tail = np.concatenate([tail, np.zeros(pre)])
         ir = np.zeros(n)
         ir[pre:] = tail[: n - pre]
         ir /= (np.sqrt(np.sum(ir ** 2)) + 1e-12)
@@ -577,6 +583,8 @@ def make_ir(rt60_low: float, rt60_mid: float, rt60_high: float, rng, *, predelay
                 ir[k] += flutter_gain * (0.82 ** i) * rng.choice([-1, 1]) * 0.3
         chans.append(ir)
     ir = np.stack(chans, axis=1)
+    k = int(0.12 * n)
+    ir[n - k:] *= (np.cos(np.linspace(0.0, 1.0, k) * np.pi / 2) ** 2)[:, None]
     return ir / (np.sqrt(np.sum(ir ** 2) / 2) + 1e-12)
 
 

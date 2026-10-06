@@ -47,7 +47,7 @@ def normalize(audio: np.ndarray, kind: str) -> np.ndarray:
 
 def _recipe_hash(name: str) -> str:
     fn = RECIPES[name]["fn"]
-    src = inspect.getsource(sys.modules[fn.__module__])
+    src = inspect.getsource(sys.modules[fn.__module__]) + inspect.getsource(dsp)
     return hashlib.sha1(src.encode()).hexdigest()[:12]
 
 
@@ -75,14 +75,6 @@ def render_recipe(name: str, dur: float, params: dict, seed_keys) -> tuple[np.nd
 def apply_cue_shaping(a: np.ndarray, cue: dict, start_abs: int, until_abs: int | None) -> np.ndarray:
     a = a.astype(np.float64)
     n = len(a)
-    # corte duro (until): recorta y aplica fade_out que termina en until
-    fo = float(cue.get("fade_out", 0.01))
-    fi = float(cue.get("fade_in", 0.005))
-    if until_abs is not None:
-        keep = max(0, min(n, until_abs - start_abs))
-        a = a[:keep]
-        n = len(a)
-    a = dsp.fade(a, max(fi, 0.003), max(fo, 0.003))
     # curva de ganancia relativa
     gc = cue.get("gain_curve")
     if gc and n:
@@ -104,10 +96,17 @@ def apply_cue_shaping(a: np.ndarray, cue: dict, start_abs: int, until_abs: int |
         gl, gr = dsp.pan_gains(pc)
         a[:, 0] *= gl * np.sqrt(2)
         a[:, 1] *= gr * np.sqrt(2)
-    # envío extra de reverb
+    # envío extra de reverb (antes del corte, para que la cola también se corte)
     send = cue.get("send")
     if send:
         a = dsp.reverb(a, send["preset"], float(send.get("db", -12)), dry=1.0, hp_send=float(send.get("hp", 0)))
+    # corte duro (until): recorta y aplica fade_out que termina exactamente en until
+    fo = float(cue.get("fade_out", 0.01))
+    fi = float(cue.get("fade_in", 0.005))
+    if until_abs is not None:
+        keep = max(0, min(len(a), until_abs - start_abs))
+        a = a[:keep]
+    a = dsp.fade(a, max(fi, 0.003), max(fo, 0.003))
     return a * 10 ** (float(cue.get("gain_db", 0.0)) / 20)
 
 
@@ -179,7 +178,7 @@ def render_option(option: str, workers: int = 2, only: set | None = None):
             raise ValueError(f"{cue['id']}: bus desconocido {bus}")
         dsp.mix_into(buses[bus], r["audio"].astype(np.float64), r["start"])
         a = r["audio"]
-        report.append(dict(id=r["id"], recipe=cue["recipe"], bus=bus, at_s=round(r["at"] / SR, 4),
+        report.append(dict(id=r["id"], recipe=cue["recipe"], bus=bus, at_s=round(r["at"] / SR, 4), at_samples=r["at"],
                            start_s=round(r["start"] / SR, 4), end_s=round((r["start"] + len(a)) / SR, 4),
                            peak_dbfs=round(float(to_db(np.abs(a).max())), 1),
                            rms_dbfs=round(float(to_db(np.sqrt((a.astype(np.float64) ** 2).mean()))), 1),

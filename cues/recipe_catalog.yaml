@@ -92,7 +92,7 @@ fol.ped_signal:     {kind: event, sync: start, params: {count: 2, rate_hz: 1.0},
                      desc: "Tic de semáforo peatonal"}
 fol.relay_click:    {kind: event, sync: transient, params: {},
                      desc: "Clic eléctrico de relé / encendido de faro (muy sutil)"}
-fol.light_contactor:{kind: event, sync: transient, params: {hum: 0.5},
+fol.light_contactor: {kind: event, sync: transient, params: {hum: 0.5},
                      desc: "Contactor de luz de estudio grande (clack metálico) + zumbido de lámpara que decae"}
 fol.droplets:       {kind: event, sync: start, params: {rate: 6.0, surface: metal},
                      desc: "Gotas cayendo/escurriendo sobre carrocería (metal|glass)"}
@@ -138,7 +138,7 @@ des.awakening:      {kind: event, sync: transient, params: {},
                      desc: "Despertar del EX2 (remate): sub + bloom FM vítreo + gotas tonales + motivo que resuelve Bb->F"}
 des.ui_tone:        {kind: event, sync: transient, params: {note: Eb6},
                      desc: "Tono UI suave y elegante"}
-des.breath_designed:{kind: event, sync: peak, params: {},
+des.breath_designed: {kind: event, sync: peak, params: {},
                      desc: "Respiración difuminada con reverb (mítica)"}
 des.wind_swell:     {kind: event, sync: peak, params: {brightness: 0.5},
                      desc: "Swell de viento ancho y diseñado (aéreos, montañas)"}

@@ -82,6 +82,13 @@ def mix_option(option: str, make_mp4: bool = True) -> dict:
     g = 10 ** (TRIM_DB / 20)
 
     buses = process_buses(raw)
+    # corte a negro (frame 1193): nada de SFX después; rampa de 5 ms que termina en el corte
+    cut = 1193 * 2000
+    ramp = np.ones(N_TOTAL)
+    k = int(0.005 * SR)
+    ramp[cut - k:cut] = np.cos(np.linspace(0, np.pi / 2, k)) ** 2
+    ramp[cut:] = 0.0
+    buses = {b: x * ramp[:, None] for b, x in buses.items()}
     sfx = sum(buses.values())
     L = headroom_limiter(g * bed, g * sfx, ceiling_db=CEILING_DB)
     stems = {b: x * L[:, None] for b, x in buses.items()}

@@ -96,7 +96,7 @@ def verify(option: str) -> dict:
         s = c.get("sync") or {}
         row = {"id": c["id"], "at_s": c["at_s"]}
         if s.get("frame") is not None:
-            dev = (c["at_s"] * SR - s["frame"] * SPF) / SPF
+            dev = (c.get("at_samples", c["at_s"] * SR) - s["frame"] * SPF) / SPF
             row["declared_dev_frames"] = round(dev, 2)
             if abs(dev) > 1.0 + 1e-6:
                 errors.append(f"{c['id']}: at={c['at_s']}s fuera de ±1 frame del frame {s['frame']}")
