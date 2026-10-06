@@ -167,32 +167,44 @@ def _grains(n: int, pos, f, tau, amp, rng, pan=None, glide=0.0, attack=2.5e-4, m
     if stereo_out:
         pl, pr = dsp.pan_gains(np.broadcast_to(np.asarray(pan, np.float64), (k,)))
     order = np.argsort(tau)
+    f32 = np.float32
     i = 0
     while i < k:
-        L = int(min(5.0 * tau[order[min(k - 1, i)]], max_len) * SR) + 2
-        chunk = max(8, int(1.2e6 // max(L, 1)))
+        L = int(min(4.0 * tau[order[min(k - 1, i)]], max_len) * SR) + 2
+        chunk = max(8, int(1.5e6 // max(L, 1)))
         sel = order[i:i + chunk]
-        L = int(min(5.0 * tau[sel].max(), max_len) * SR) + 2
-        T = (np.arange(L) / SR)[None, :]
-        tk = tau[sel][:, None]
-        env = (1.0 - np.exp(-T / attack)) * np.exp(-T / tk)
-        g = gl_all[sel][:, None]
+        L = int(min(4.0 * tau[sel].max(), max_len) * SR) + 2       # 4 tau = -35 dB
+        T = (np.arange(L, dtype=f32) / f32(SR))[None, :]
+        tk = tau[sel].astype(f32)[:, None]
+        env = (f32(1.0) - np.exp(-T / f32(attack))) * np.exp(-T / tk)
+        g = gl_all[sel].astype(f32)[:, None]
         if np.any(g):
-            tg = 0.8 * tk
-            ph = TWO_PI * f[sel][:, None] * (T + g * (T - tg * (1.0 - np.exp(-T / tg))))
+            tg = f32(0.8) * tk
+            ph = f32(TWO_PI) * f[sel].astype(f32)[:, None] * (T + g * (T - tg * (f32(1.0) - np.exp(-T / tg))))
         else:
-            ph = TWO_PI * f[sel][:, None] * T
-        G = amp[sel][:, None] * env * np.sin(ph + phi[sel][:, None])
+            ph = f32(TWO_PI) * f[sel].astype(f32)[:, None] * T
+        G = amp[sel].astype(f32)[:, None] * env * np.sin(ph + phi[sel].astype(f32)[:, None])
         idx = pos[sel][:, None] + np.arange(L)[None, :]
         m = idx < n
         ii = idx[m]
         if stereo_out:
-            out[:, 0] += np.bincount(ii, weights=(G * pl[sel][:, None])[m], minlength=n)
-            out[:, 1] += np.bincount(ii, weights=(G * pr[sel][:, None])[m], minlength=n)
+            out[:, 0] += np.bincount(ii, weights=(G * pl[sel].astype(f32)[:, None])[m], minlength=n)
+            out[:, 1] += np.bincount(ii, weights=(G * pr[sel].astype(f32)[:, None])[m], minlength=n)
         else:
             out += np.bincount(ii, weights=G[m], minlength=n)
         i += len(sel)
     return out
+
+
+_SOS_CACHE: dict = {}
+
+
+def _bp_sos(order, flo, fhi):
+    """Pasabanda Butterworth cacheado (bordes cuantizados a 1/24 de octava)."""
+    key = (order, int(round(np.log2(flo) * 24)), int(round(np.log2(fhi) * 24)))
+    if key not in _SOS_CACHE:
+        _SOS_CACHE[key] = dsp.butter_sos(order, [2 ** (key[1] / 24), 2 ** (key[2] / 24)], "bandpass")
+    return _SOS_CACHE[key]
 
 
 def _crackle(n: int, rate, rng, f_lo, f_hi, q=6.0, n_res=6, amp=None, amp_sigma=0.45, pan_spread=None):
@@ -223,7 +235,8 @@ def _crackle(n: int, rate, rng, f_lo, f_hi, q=6.0, n_res=6, amp=None, amp_sigma=
                 out[:, ch] += signal.lfilter(b, aa, imp)
         else:
             out += signal.lfilter(b, aa, np.bincount(pos[m], weights=a[m], minlength=n))
-    return out
+    # limitar a la banda propia: los flancos de 2o orden dejarían pasar el 'clic' del impulso hasta Nyquist
+    return dsp.sos_filter(out, _bp_sos(2, 0.8 * f_lo, min(1.2 * f_hi, 0.45 * SR)))
 
 
 def _bursts(n: int, pos, rng, lo, hi, dur_lo, dur_hi, amp, pan=None, attack=0.0015, order=2):
@@ -236,7 +249,7 @@ def _bursts(n: int, pos, rng, lo, hi, dur_lo, dur_hi, amp, pan=None, attack=0.00
         L = max(16, int(rng.uniform(dur_lo, dur_hi) * SR))
         flo = lo * np.exp(rng.uniform(-0.15, 0.15))
         fhi = max(flo * 1.3, hi * np.exp(rng.uniform(-0.15, 0.15)))
-        x = dsp.sos_filter(rng.standard_normal(L + 64), dsp.butter_sos(order, [flo, fhi], "bandpass"))[64:]
+        x = dsp.sos_filter(rng.standard_normal(L + 64), _bp_sos(order, flo, fhi))[64:]
         u = np.arange(L) / L
         ka = max(2, int(attack * SR))
         env = (1 - u) ** rng.uniform(1.6, 3.0)
@@ -418,7 +431,7 @@ def _tire_roll(v, rng, surface="dry", persp="close", wet=None, corr=None, partic
     # --- grava: granos + crunches
     if surface == "gravel" and particles > 0:
         wf = 1.0 - 0.2 * min(wet, 1.0)
-        rate = (300.0 + 1200.0 * np.clip(v / 14.0, 0, 1.2)) * (v > 0.3) * bst * (1 + 0.35 * _mod(ts, rng, 1.5))
+        rate = (300.0 + 1200.0 * np.clip(v / 14.0, 0, 1.0)) * (v > 0.3) * bst * (1 + 0.35 * _mod(ts, rng, 1.5))
         pos = _poisson_pos(rate, rng, n)
         k = len(pos)
         f = np.exp(rng.uniform(np.log(1500 * wf), np.log(6000 * wf), k))
@@ -658,6 +671,24 @@ def _straight_passby(dur, rng, *, speed_kmh, closest_m, direction, surface, ev, 
     return out, sync, src, info
 
 
+def _spray_tail(n, rng, *, tpk, v_ms, direction, amount):
+    """Estela de agua de un auto sobre piso mojado: neblina HP 2.5-9 kHz + gotitas que caen, que quedan
+    flotando detrás del auto después del paso más cercano (deriva hacia el lado por donde se aleja)."""
+    t = np.arange(n) / SR
+    tau = 0.25 + 0.25 * np.clip(v_ms / 14.0, 0, 1.5)
+    env = _ss(t, tpk - 0.06, tpk + 0.12) * np.exp(-np.maximum(t - tpk - 0.12, 0) / tau)
+    if env.max() <= 0:
+        return np.zeros((n, 2))
+    mist = dsp.decorrelated_stereo(lambda r: dsp.bp(r.standard_normal(n), 2500, 9000, 2), rng, 0.3)
+    mist = mist * np.clip(1 + 0.5 * _bl_noise(n, rng, 30.0), 0.2, None)[:, None]
+    mist /= _rms(mist)
+    drops = _crackle(n, 900.0 * env * np.clip(v_ms / 10.0, 0.3, 1.5), rng, 3500, 9000, q=12.0, n_res=6,
+                     pan_spread=0.7)
+    y = (mist + 0.3 * drops / _rms(drops)) * env[:, None]
+    gl, gr = dsp.pan_gains(direction * 0.35 * _ss(t, tpk, tpk + 0.6))
+    return np.stack([y[:, 0] * gl, y[:, 1] * gr], axis=1) * 1.41 * amount
+
+
 def _body_whoomph(n, rng, *, v_ms, closest, tpk, direction, amount):
     """Pulso de presión del cuerpo del auto al pasar muy cerca (80-250 Hz, envolvente ~1/r^2.5)."""
     t = np.arange(n) / SR
@@ -680,6 +711,11 @@ def passby(dur, rng, *, speed_kmh=50.0, closest_m=4.0, direction=1, surface="wet
                                             direction=direction, surface=surface, ev=float(ev) / 0.25,
                                             height_m=height_m, peak_pos=peak_pos, aero=aero, wetness=wetness)
     n = info["n"]
+    wet_amt = float(wetness) if wetness is not None else (1.0 if _surface(surface) == "wet" else 0.0)
+    if wet_amt > 0:
+        out = out + _spray_tail(n, rng, tpk=info["tpk"] + info["closest"] / C_SOUND, v_ms=info["v_ms"],
+                                direction=info["direction"],
+                                amount=0.22 * wet_amt * info["src_rms"] * min(1.0, 4.0 / info["closest"]))
     out = dsp.hp(out, hp_hz, 4) if hp_hz else out
     if body > 0 and info["closest"] < 6.0:
         out = out + _body_whoomph(n, rng, v_ms=info["v_ms"], closest=info["closest"], tpk=info["tpk"],
@@ -923,6 +959,8 @@ def wet_glide(dur, rng, *, speed_kmh=20.0, sizzle=0.6, closest_m=2.0, direction=
     dd = dsp.passby(d_src, speed_ms=info["v_ms"], closest_m=info["closest"], t_closest=info["tpk"],
                     direction=info["direction"], height_m=0.3, ground=0.5)
     out = out + dd
+    out = out + _spray_tail(n, rng, tpk=info["tpk"] + info["closest"] / C_SOUND, v_ms=info["v_ms"],
+                            direction=info["direction"], amount=0.15 * sz * info["src_rms"])
     out = dsp.hp(out, hp_hz, 4) if hp_hz else out
     tail = int(0.3 * SR)
     out = _tail_fade(out, n - tail, tail)
@@ -984,6 +1022,17 @@ def gravel_curve(dur, rng, *, speed_kmh=25.0, wet=True, radius_m=14.0, closest_m
     st = st[P:]
     rd = rd[P:]
     i_pk = int(round(tpk * SR))
+    # piedritas lanzadas hacia afuera de la curva que caen alrededor de la cámara (después del ápice)
+    kf = int(rng.integers(5, 13) * float(np.clip(slip, 0, 2)) * np.clip(v_ms / 7.0, 0.5, 1.5))
+    if kf > 0:
+        fp = np.clip((tpk + rng.uniform(0.12, 0.75, kf)) * SR, 0, n - 1).astype(np.int64)
+        fpan = np.clip(-sgn * 0.3 + rng.uniform(-0.6, 0.6, kf), -0.9, 0.9)
+        fa = rng.lognormal(0, 0.5, kf)
+        ff = np.exp(rng.uniform(np.log(1300), np.log(4200), kf))
+        fl = _grains(n, fp, ff, rng.uniform(2e-3, 5e-3, kf), fa, rng, pan=fpan)
+        fl += _grains(n, fp, ff * rng.uniform(2.1, 2.7, kf), rng.uniform(1e-3, 2.5e-3, kf), 0.5 * fa, rng, pan=fpan)
+        fl += 0.6 * _bursts(n, fp, rng, 900, 3500, 0.004, 0.012, fa, pan=fpan, attack=0.0005)
+        st = st + fl * (0.22 * np.abs(st[i_pk - 2400:i_pk + 2400]).max() / (np.abs(fl).max() + 1e-12))
     sync = int(round((tpk + rd[min(i_pk, n - 1)] / C_SOUND) * SR))
     st = dsp.hp(st, hp_hz, 4) if hp_hz else st
     tail = int(0.25 * SR)

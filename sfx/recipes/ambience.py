@@ -51,6 +51,16 @@ def _note(name: str) -> float:
     return 440.0 * 2.0 ** ((midi - 69) / 12.0)
 
 
+_KEY = ("Bb", "Db", "Eb", "F", "Ab")
+
+
+def _key_freqs(lo: float, hi: float) -> np.ndarray:
+    """Frecuencias de las notas de la tonalidad (Bb Db Eb F Ab) entre lo y hi."""
+    fs = [_note(f"{nm}{o}") for o in range(1, 9) for nm in _KEY]
+    fs = np.array(sorted(f for f in fs if lo <= f <= hi))
+    return fs if len(fs) else np.array([np.sqrt(lo * hi)])
+
+
 def _smooth01(x):
     x = np.clip(x, 0.0, 1.0)
     return x * x * (3.0 - 2.0 * x)
@@ -126,26 +136,50 @@ def _coh(f, lo=0.8, hi=0.3, f0=500.0):
     return hi + (lo - hi) / (1.0 + (np.asarray(f) / f0) ** 1.5)
 
 
-def _paint(n: int, rng, gain, *, coh=0.5, slope: float = 0.0, nperseg: int = 2048) -> np.ndarray:
+def _paint(n: int, rng, gain, *, coh=0.5, slope: float = 0.0, nperseg: int = 2048, tdec: int = 4) -> np.ndarray:
     """Ruido blanco estéreo (var 1) moldeado en STFT.
 
     gain: array [F,T] / [2,F,T] o función gain(t [T], f [F]) -> idem (magnitud = densidad relativa).
+          Las funciones se evalúan cada `tdec` frames (control ~43 ms) y se interpolan (todo es lento).
     coh: escalar o función de f -> coherencia (= correlación) L/R por banda.
     slope: inclinación global en dB/oct (ref 1 kHz)."""
     hop = nperseg // 4
-    L = n + nperseg
-    W = rng.standard_normal((3, L))
-    f, t, Z = signal.stft(W, SR, nperseg=nperseg, noverlap=nperseg - hop)
+    # STFT de ruido blanco = coeficientes gaussianos complejos i.i.d. (se sintetizan directo: sólo ISTFT)
+    T = (n + nperseg) // hop + 2
+    f = np.fft.rfftfreq(nperseg, 1.0 / SR)
+    t = np.arange(T) * hop / SR
+    win = signal.get_window("hann", nperseg)
+    sig = np.float32(np.sqrt(2.0 * np.sum(win ** 2)) / np.sum(win))  # -> var 1 a la salida (verificado)
+    Z = (rng.standard_normal((3, len(f), T), dtype=np.float32)
+         + 1j * rng.standard_normal((3, len(f), T), dtype=np.float32)) * sig
+    Z[:, 0, :] = Z[:, 0, :].real * np.sqrt(2.0)
+    Z[:, -1, :] = Z[:, -1, :].real * np.sqrt(2.0)
     c = coh(f) if callable(coh) else np.full(len(f), float(coh))
     c = np.clip(np.asarray(c, np.float64), 0.0, 1.0)[:, None]
-    a, b = np.sqrt(c), np.sqrt(1.0 - c)
-    tilt = ((np.maximum(f, 20.0) / 1000.0) ** (slope / 6.0206))[:, None]
-    G = np.asarray(gain(t, f) if callable(gain) else gain, dtype=np.float64)
+    a, b = np.sqrt(c).astype(np.float32), np.sqrt(1.0 - c).astype(np.float32)
+    tilt = ((np.maximum(f, 20.0) / 1000.0) ** (slope / 6.0206))[:, None].astype(np.float32)
+    if callable(gain):
+        if tdec > 1 and T > 2 * tdec:
+            ts = t[::tdec]
+            if ts[-1] < t[-1]:
+                ts = np.append(ts, t[-1])
+            Gs = np.asarray(gain(ts, f), dtype=np.float32)
+            pos = np.interp(t, ts, np.arange(len(ts)))
+            i0 = np.minimum(pos.astype(np.int64), len(ts) - 2)
+            w = (pos - i0).astype(np.float32)
+            G = Gs[..., i0] * (1 - w) + Gs[..., i0 + 1] * w
+        else:
+            G = np.asarray(gain(t, f), dtype=np.float32)
+    else:
+        G = np.asarray(gain, dtype=np.float32)
     if G.ndim == 2:
         G = np.stack([G, G])
-    Y = np.stack([(a * Z[0] + b * Z[1]) * tilt * G[0], (a * Z[0] + b * Z[2]) * tilt * G[1]])
+    Y = np.stack([(a * Z[0] + b * Z[1]) * (tilt * G[0]), (a * Z[0] + b * Z[2]) * (tilt * G[1])])
     _, y = signal.istft(Y, SR, nperseg=nperseg, noverlap=nperseg - hop)
-    return np.ascontiguousarray(y[:, :n].T)
+    y = y[:, nperseg // 2: nperseg // 2 + n]  # descartar el borde (primer frame centrado en 0)
+    if y.shape[1] < n:
+        y = np.pad(y, ((0, 0), (0, n - y.shape[1])))
+    return np.ascontiguousarray(y.T, dtype=np.float64)
 
 
 # ====================================================================== espacio / acabado
@@ -194,7 +228,6 @@ def _finish(y, pre: int, n: int, hp_hz=120.0, order=4, fin=0.012, fout=0.04, bas
         y = dsp.pad_to(y, n)
     y = dsp.fade(y, fin, fout)
     y = np.nan_to_num(y, nan=0.0, posinf=0.0, neginf=0.0)
-    y -= y.mean(axis=0, keepdims=True) * 0.0  # (DC ya removido por el HP)
     return y.astype(np.float32)
 
 
@@ -251,23 +284,34 @@ def _grain_bank(n, rng, rate_curve, bands, *, att_ms=(0.4, 3.0), dec_ms=(4.0, 30
     envL = np.zeros((nb, n))
     envR = np.zeros((nb, n))
     max_len = int(0.2 * SR)
-    for p in pos:
-        b = int(rng.integers(0, nb))
-        a = 10 ** (rng.uniform(-14, 0) / 20)
-        gl, gr = dsp.pan_gains(rng.uniform(-pan_spread, pan_spread))
-        for j in range(int(rng.integers(cluster[0], cluster[1] + 1))):  # micro-crujidos dentro del grano
-            off = p + (0 if j == 0 else int(rng.uniform(2, 18) * 1e-3 * SR))
-            ta = rng.uniform(*att_ms) * 1e-3
-            td = rng.uniform(*dec_ms) * 1e-3
-            L = min(max_len, int((ta + 5 * td) * SR))
-            if off >= n or L < 8:
-                continue
-            tt = np.arange(L) / SR
-            e = np.where(tt < ta, np.sin(0.5 * np.pi * tt / max(ta, 1e-5)) ** 2, np.exp(-(tt - ta) / td))
-            e *= a * (1.0 if j == 0 else rng.uniform(0.25, 0.7))
-            m = min(L, n - off)
-            envL[b, off:off + m] += gl * e[:m]
-            envR[b, off:off + m] += gr * e[:m]
+    tt_all = np.arange(max_len) / SR
+    k = len(pos)
+    # parámetros por grano (vectorizados) y micro-crujidos dentro de cada grano
+    nc = rng.integers(cluster[0], cluster[1] + 1, k)
+    gi = np.repeat(np.arange(k), nc)
+    first = np.ones(len(gi), bool)
+    first[1:] = gi[1:] != gi[:-1]
+    off = pos[gi] + np.where(first, 0, (rng.uniform(2, 18, len(gi)) * 1e-3 * SR).astype(np.int64))
+    band = rng.integers(0, nb, k)[gi]
+    amp = (10 ** (rng.uniform(-14, 0, k) / 20))[gi] * np.where(first, 1.0, rng.uniform(0.25, 0.7, len(gi)))
+    pl, pr = dsp.pan_gains(rng.uniform(-pan_spread, pan_spread, k))
+    pl, pr = pl[gi], pr[gi]
+    ta = rng.uniform(*att_ms, len(gi)) * 1e-3
+    td = rng.uniform(*dec_ms, len(gi)) * 1e-3
+    Ls = np.minimum(max_len, ((ta + 5 * td) * SR).astype(np.int64))
+    for i in range(len(gi)):
+        o, L = int(off[i]), int(Ls[i])
+        if o >= n or L < 8:
+            continue
+        tt = tt_all[:L]
+        e = np.exp(-np.maximum(tt - ta[i], 0.0) / td[i])
+        ka = min(L, int(ta[i] * SR))
+        if ka > 0:
+            e[:ka] = np.sin(0.5 * np.pi * tt[:ka] / ta[i]) ** 2
+        m = min(L, n - o)
+        e = amp[i] * e[:m]
+        envL[band[i], o:o + m] += pl[i] * e
+        envR[band[i], o:o + m] += pr[i] * e
     out = np.zeros((n, 2))
     for b, (lo, hi) in enumerate(bands):
         if not envL[b].any():
@@ -347,10 +391,10 @@ def _drips_layer(N, rng, *, rate=1.0, pitch=1.0, dist=0.5, t_start=0.0, t_vis=No
         f0 = rng.uniform(1500, 3500) * pitch
         tau = rng.uniform(0.008, 0.02)
         hard = rng.random() < 0.25
-        while t < dur:
-            place(t, f0 * (1 + 0.05 * rng.standard_normal()), tau * rng.uniform(0.85, 1.15),
-                  rng.uniform(0.15, 0.55), pn + rng.uniform(-0.04, 0.04), d, hard and rng.random() < 0.8)
-            t += per * max(0.35, 1 + 0.2 * rng.standard_normal())
+        while t < dur:  # misma fuente: tamaño de gota, altura y ritmo varían gota a gota
+            place(t, f0 * (1 + 0.08 * rng.standard_normal()), tau * rng.uniform(0.75, 1.3),
+                  rng.uniform(0.1, 0.6), pn + rng.uniform(-0.05, 0.05), d, hard and rng.random() < 0.8)
+            t += per * max(0.3, 1 + 0.27 * rng.standard_normal())
     for t in dsp.poisson_times(max(0.0, dur - t_start), 0.2 * rate, rng, t_start):
         place(t, rng.uniform(1500, 3500) * pitch, rng.uniform(0.008, 0.02), rng.uniform(0.1, 0.6),
               rng.uniform(-0.9, 0.9), float(np.clip(dist + rng.uniform(-0.4, 0.4), 0.05, 1.0)), rng.random() < 0.2)
@@ -388,7 +432,7 @@ def _lapping(N, rng, *, lap=0.5, t_vis=0.0):
     first = True
     while t < dur:
         amp = rng.uniform(0.45, 1.0) * (0.6 + 0.8 * lap)
-        pn = rng.uniform(-0.7, 0.7)
+        pn = rng.uniform(-0.85, 0.85)
         ta = rng.uniform(0.06, 0.16)
         td = rng.uniform(0.22, 0.6)
         L = int((ta + 4 * td) * SR)
@@ -481,7 +525,8 @@ def _wind_layers(N, rng, *, strength=0.5, gustiness=0.5, whistle=0.3, texture="n
     # ------------------------------------------------ silbidos eólicos
     if whistle > 0:
         nw = int(n_whistles or rng.integers(2, 5))
-        base = np.exp(rng.uniform(np.log(whistle_band[0] * 1.1), np.log(whistle_band[1] * 0.8), nw))
+        # altura de reposo en notas de la tonalidad (luego se desliza con la ráfaga, regla de Strouhal)
+        base = rng.choice(_key_freqs(whistle_band[0] * 1.1, whistle_band[1] * 0.8), nw)
         Q = rng.uniform(8, 25, nw)
         thr = rng.uniform(0.7, 1.15, nw)
         pans = rng.uniform(-0.75, 0.75, nw)
@@ -617,7 +662,7 @@ def _traffic_wash(N, rng, *, lp_hz=600.0, density=0.5, fog=True):
 def _tonal_hint(N, rng, t0, *, level=1.0):
     """Indicio tonal muy lejano: silbido de un tranvía/bus eléctrico distante (nota de la tonalidad),
     con leve deriva de pitch, envolvente lenta y mucha distancia. Nada de bocinas."""
-    note = rng.choice(["Ab4", "Bb4", "Db5", "Eb5", "F4"])
+    note = rng.choice(["Ab4", "Bb4", "Db5", "Eb5", "F5"])
     f0 = _note(note)
     sw = rng.uniform(2.5, 4.5)
     L = int(min(N - int(t0 * SR), sw * 2.2 * SR))
@@ -963,7 +1008,7 @@ def city_distant(dur, rng, *, density=0.5, lp_hz=600.0, passbys=1, fog=True, ton
     if tonal > 0 and n / SR > 2.0 and rng.random() < min(1.0, 1.5 * tonal):
         t0 = pre / SR + rng.uniform(0.0, 0.6) * (n / SR)
         th, hint = _tonal_hint(N, rng, t0)
-        th *= wr * _db(-27 + 10 * tonal) / (_rms(th[int(t0 * SR):]) + 1e-12)
+        th *= wr * _db(-19 + 10 * tonal) / (_rms(th[int(t0 * SR):]) + 1e-12)
         y += 0.25 * th
         send += 1.5 * th
     y = y + _space(send, ir, 0.0, -200)
@@ -1167,7 +1212,7 @@ def lake(dur, rng, *, lap=0.5, wind=0.2, **_):
                       body=(350.0, 700.0))
     br = _wind_mix(Lw, body_db=-3.0)
     y = laps + shim / _rms(shim) * lr * _db(-13) + br / _rms(br) * lr * _db(-9 + 14 * np.log10(max(wind, 0.02) / 0.2))
-    y = _space(y, "open_exterior", -10.0, 0.0)
+    y = _space(y, "open_exterior", -7.0, 0.0)
     out = _finish(y, pre, n)
     return Render(out, 0, {"lap_times_s": [round(t - pre / SR, 2) for t in times if t >= pre / SR]})
 
@@ -1218,7 +1263,7 @@ def cabin(dur, rng, *, speed_kmh=60.0, road=0.5, hvac=0.3, pillar_wind=0.3, **_)
     aero_db = 60 * np.log10(v / 60.0)
     # rumble de ruta: centro y nivel caminan con el pavimento
     cen = 220 * (1 + _mod(N, rng, 0.1, 1.5, 0.15))
-    cav = 225 * (0.97 + 0.06 * min(v, 130) / 130) * (1 + _mod(N, rng, 0.05, 0.5, 0.01))  # cavidad del neumático
+    cav = _note("Bb3") * (0.98 + 0.03 * min(v, 130) / 130) * (1 + _mod(N, rng, 0.05, 0.5, 0.01))  # cavidad neumático
     surf_amp = [_db(_mod(N, rng, 0.2, 1.5, 2.0) + _mod(N, rng, 4.0, 20.0, 0.8)) for _ in range(2)]
 
     def g_road(t, f):
@@ -1428,60 +1473,89 @@ def birds_distant(dur, rng, *, count=2, species="generic", space=None, distance=
     if sp == "raptor":
         y = dsp.lp(y, 3500, 2)
     out = _finish_event(y, hp_hz=300.0, fin=0.003, fout=0.2)
-    return Render(out, 0, {"call_times_s": [round(t, 3) for t in times], "space": ir})
+    # sync = primer contacto (inicio de la primera llamada; los 10-40 ms previos quedan antes de `at`)
+    return Render(out, int(round(times[0] * SR)), {"call_times_s": [round(t, 3) for t in times], "space": ir})
 
 
 # ====================================================================== auditions
 
 AUDITIONS = [
-    # (receta, dur, params, at (timeline s) o None, gain_db, tag)
+    # (receta, dur, params, at (timeline s) o None, gain_db, tag[, seed])
     ("amb.room_tone", 1.6, {"space": "underpass"}, 0.0, -14, "room_tone_underpass"),
+    ("amb.room_tone", 1.6, {"space": "underpass"}, 0.0, -14, "room_tone_underpass_s1", 1),
     ("amb.room_tone", 2.0, {"space": "studio"}, 23.63, -16, "room_tone_studio"),
+    ("amb.room_tone", 2.0, {"space": "city_fog"}, 5.0, -16, "room_tone_city_fog"),
     ("amb.room_tone", 2.0, {"space": "cabin"}, None, None, "room_tone_cabin"),
     ("amb.room_tone", 2.0, {"space": "tunnel"}, None, None, "room_tone_tunnel"),
     ("amb.city_distant", 7.0, {"density": 0.5, "lp_hz": 600, "passbys": 1, "fog": True}, 5.0, -18, "city_distant_fog"),
+    ("amb.city_distant", 7.0, {"density": 0.5, "lp_hz": 600, "passbys": 2, "fog": True, "tonal": 0.5}, None, None,
+     "city_distant_fog_s3", 3),
     ("amb.fog_air", 7.0, {"brightness": 0.5, "motion": 0.3}, 5.0, -18, "fog_air"),
+    ("amb.fog_air", 7.0, {"brightness": 0.7, "motion": 0.5}, None, None, "fog_air_s1", 1),
     ("amb.drips", 4.0, {"rate": 1.0, "space": "underpass_concrete"}, 0.0, -16, "drips_underpass"),
+    ("amb.drips", 6.0, {"rate": 1.0, "space": "underpass_concrete"}, None, None, "drips_underpass_s1", 1),
     ("amb.surf", 2.5, {"intensity": 0.7, "crest_at": 0.3, "distance": "far"}, 14.4, -12, "surf_far"),
-    ("amb.surf", 4.0, {"intensity": 0.8, "crest_at": 0.35, "distance": "near"}, None, None, "surf_near"),
-    ("amb.wind", 6.0, {"strength": 0.5, "gustiness": 0.5, "whistle": 0.3, "texture": "none"}, None, None, "wind_none"),
-    ("amb.wind", 4.0, {"strength": 0.6, "texture": "grass"}, None, None, "wind_grass"),
+    ("amb.surf", 2.5, {"intensity": 0.7, "crest_at": 0.3, "distance": "far"}, None, None, "surf_far_s1", 1),
+    ("amb.surf", 5.0, {"intensity": 0.8, "crest_at": 0.35, "distance": "near"}, None, None, "surf_near"),
+    ("amb.wind", 8.0, {"strength": 0.5, "gustiness": 0.5, "whistle": 0.3, "texture": "none"}, None, None, "wind_none"),
+    ("amb.wind", 6.0, {"strength": 0.6, "texture": "grass"}, None, None, "wind_grass"),
+    ("amb.wind", 4.0, {"strength": 0.5, "texture": "leaves"}, None, None, "wind_leaves"),
+    ("amb.wind", 4.0, {"strength": 0.5, "texture": "snow"}, None, None, "wind_snow"),
     ("amb.mountain_wind", 1.6, {"strength": 0.6, "river": 0.3, "echo": True}, 18.1, -14, "mountain_wind_valley"),
     ("amb.mountain_wind", 3.0, {"strength": 0.7, "river": 0.2, "echo": True}, 39.92, -14, "mountain_wind_torres"),
+    ("amb.mountain_wind", 3.0, {"strength": 0.7, "river": 0.2, "echo": True}, None, None, "mountain_wind_torres_s1", 1),
     ("amb.forest", 1.6, {"rustle": 0.5, "birds": 1, "wind": 0.3}, 28.0, -14, "forest_aerial"),
     ("amb.forest", 2.6, {"rustle": 0.6, "birds": 2, "wind": 0.3}, 31.5, -14, "forest_low"),
+    ("amb.forest", 2.6, {"rustle": 0.6, "birds": 2, "wind": 0.3}, None, None, "forest_low_s1", 1),
     ("amb.lake", 1.6, {"lap": 0.5, "wind": 0.2}, 30.0, -12, "lake"),
+    ("amb.lake", 6.0, {"lap": 0.5, "wind": 0.2}, None, None, "lake_long_s1", 1),
     ("amb.desert_wind", 1.4, {"strength": 0.5, "sand": 0.5}, 25.3, -12, "desert_wind"),
+    ("amb.desert_wind", 6.0, {"strength": 0.6, "sand": 0.6}, None, None, "desert_wind_long_s1", 1),
     ("amb.alpine", 1.2, {"strength": 0.5}, 36.2, -14, "alpine"),
+    ("amb.alpine", 6.0, {"strength": 0.5}, None, None, "alpine_long_s1", 1),
     ("amb.cabin", 3.4, {"speed_kmh": 60}, 19.2, -16, "cabin_60"),
+    ("amb.cabin", 1.6, {"speed_kmh": 80}, 38.5, -16, "cabin_80_ex5"),
     ("amb.cabin", 3.0, {"speed_kmh": 110, "pillar_wind": 0.4}, None, None, "cabin_110"),
     ("amb.cabin_still", 3.0, {"hvac": 0.3, "exterior": "city_fog"}, None, None, "cabin_still"),
     ("amb.tunnel", 1.8, {"fans": 0.5, "drip": 0.2}, 42.4, -14, "tunnel"),
+    ("amb.tunnel", 6.0, {"fans": 0.5, "drip": 0.3}, None, None, "tunnel_long_s1", 1),
     ("amb.studio", 1.8, {"hum": 0.3}, 23.5, -16, "studio"),
     ("amb.empty_city_day", 1.9, {"traffic": 0.3, "birds": 2, "wind": 0.2}, 46.75, -10, "empty_city_day"),
+    ("amb.empty_city_day", 1.9, {"traffic": 0.3, "birds": 2, "wind": 0.2}, 46.75, -10, "empty_city_day_s1", 1),
+    ("amb.empty_city_day", 1.9, {"traffic": 0.3, "birds": 2, "wind": 0.2}, 46.75, -10, "empty_city_day_s2", 2),
     ("amb.birds_distant", 3.0, {"count": 2, "species": "generic"}, None, None, "birds_generic"),
+    ("amb.birds_distant", 3.0, {"count": 2, "species": "generic", "space": "forest"}, None, None, "birds_generic_forest",
+     1),
     ("amb.birds_distant", 3.0, {"count": 1, "species": "raptor"}, 40.0, -10, "birds_raptor"),
-    ("amb.birds_distant", 2.0, {"count": 3, "species": "sparrow", "space": "city_day_street"}, None, None,
+    ("amb.birds_distant", 2.0, {"count": 3, "species": "sparrow", "space": "city_day_street"}, 46.9, -8,
      "birds_sparrow"),
 ]
 
 
-def _run_auditions(only=None, seeds=(0,)):
+def _run_auditions(only=None):
     from ..audition import audition
-    for name, dur, params, at, gain, tag in AUDITIONS:
+    for item in AUDITIONS:
+        name, dur, params, at, gain, tag = item[:6]
+        seed = item[6] if len(item) > 6 else 0
         if only and not any(o in tag or o == name for o in only):
             continue
-        for s in seeds:
-            t = tag if s == 0 else f"{tag}_s{s}"
-            met = audition(name, dur, params, seed=s, at=at, gain=gain, tag=t)
-            ctx = met.get("context", {}).get("sfx_vs_bed_db_by_band", {})
-            print(f"{t:28s} peak {met['peak_dbfs']:6.1f} rms {met['rms_dbfs']:6.1f} corr {met.get('lr_corr')} "
-                  f"cent {met['centroid_hz']:6.0f} clicks {met['click_candidates']:3d} "
-                  f"ac {met.get('max_autocorr_0.1-5s')} dc {met['dc_db']}"
-                  + (f"\n{'':28s} ctx {ctx}" if ctx else ""))
+        met = audition(name, dur, params, seed=seed, at=at, gain=gain, tag=tag)
+        ctx = met.get("context", {}).get("sfx_vs_bed_db_by_band", {})
+        print(f"{tag:28s} peak {met['peak_dbfs']:6.1f} rms {met['rms_dbfs']:6.1f} corr {met.get('lr_corr')} "
+              f"cent {met['centroid_hz']:6.0f} clicks {met['click_candidates']:3d} "
+              f"ac {met.get('max_autocorr_0.1-5s')} dc {met['dc_db']}"
+              + (f"\n{'':28s} ctx {ctx}" if ctx else ""), flush=True)
 
 
 if __name__ == "__main__":
+    # python -m sfx.recipes.ambience [filtro ...]  -> regenera out/audition/ambience/
+    # Como script este módulo se carga como __main__: se retiran sus registros y se usa el del paquete
+    # (audition() importa sfx.recipes.* y si no, el registro se duplicaría).
+    import importlib
     import sys
 
-    _run_auditions(sys.argv[1:] or None)
+    from ..core import RECIPES
+
+    for _k in [k for k, v in RECIPES.items() if v["fn"].__module__ == "__main__"]:
+        del RECIPES[_k]
+    importlib.import_module("sfx.recipes.ambience")._run_auditions(sys.argv[1:] or None)
