@@ -1,0 +1,1187 @@
+# Opción A — "Hiperreal"
+# Foley y ambientes creíbles que vuelven tangible el mundo; elegancia por contención.
+# Siempre por debajo de música y locución. Sin whooshes/subs/brillos diseñados (buses DES y SUB sin uso):
+# el único "aire" que acompaña un movimiento de cámara es viento natural (amb.wind) en el aéreo del desierto.
+# Autos ELÉCTRICOS: rodado, aero, AVAS y siseo de agua; jamás motor de combustión.
+# Frames = verdad (24 fps). Spotting hecho cuadro a cuadro sobre media/picture.mov (out/spot_a/tile_*.png).
+# Sub-cortes vistos en imagen que no están en cuts[]: 56 (oscuro->torres), 308 (paso de rueda), 404/418
+# (arco -> ruta oscura -> haces), 747 (lago -> mano), 771 (bosque -> EX5 frente), 801 (EX2 por parabrisas),
+# 838 (capó), 989 (portón). Se citan como "f:<n>".
+option: A
+title: "Hiperreal"
+cues:
+
+  # ======================================================= 0.00-1.21 PASO BAJO AL AMANECER (hueco VO 0-1.15)
+  - id: A010_underpass_room
+    recipe: amb.room_tone
+    at: 0.0
+    dur: 1.5
+    bus: AMB
+    gain_db: -13
+    params: {space: underpass, air_db: -18, rumble_db: -8}
+    width: 1.2
+    fade_in: 0.2
+    fade_out: 0.17
+    until: "cut[0]+4"
+    vo_protect: normal
+    sync: {type: free}
+    notes_es: "Tono de hormigón bajo el paso elevado; cola L-cut 4 cuadros sobre la rueda"
+
+  - id: A020_underpass_city_wash
+    recipe: amb.city_distant
+    at: 0.0
+    dur: 1.5
+    bus: AMB
+    gain_db: -19
+    params: {density: 0.3, lp_hz: 500, passbys: 1, fog: true}
+    width: 1.4
+    fade_in: 0.3
+    fade_out: 0.17
+    until: "cut[0]+4"
+    vo_protect: normal
+    sync: {type: free}
+    notes_es: "Ciudad lejana al amanecer más allá de la boca del paso (hombre en silueta)"
+
+  - id: A030_underpass_drips
+    recipe: amb.drips
+    seed: 2                 # toma con 2 gotas tardías (0.82 y 0.97 s) y menos resonancia sostenida
+    at: 0.0
+    dur: 1.3
+    bus: AMB
+    gain_db: -18
+    params: {rate: 2.2, space: underpass_concrete, pitch: 1.0}
+    pan: -0.35
+    width: 1.2
+    fade_in: 0.05
+    fade_out: 0.1
+    until: "cut[0]+2"
+    vo_protect: normal
+    sync: {type: free}
+    notes_es: "Dos gotas tardías (0.82 y 0.97 s) en los pilares de la izquierda, con su reverb de hormigón"
+
+  - id: A040_underpass_ex2_avas
+    recipe: veh.avas_idle
+    at: 0.0
+    dur: 1.4
+    bus: VEH
+    gain_db: -20
+    params: {level: 0.35}
+    pan: 0.2
+    width: 0.8
+    fade_in: 0.35
+    fade_out: 0.1
+    until: "cut[0]+2"
+    vo_protect: normal
+    sync: {type: free}
+    notes_es: "EX2 encendido en primer plano (centro-derecha): AVAS apenas presente"
+
+  # ======================================================= 1.21-2.33 RUEDA (oscurece ~2.04 s, f49)
+  - id: A050_wheel_spin
+    recipe: veh.wheel_spin
+    at: "cut[0]"
+    dur: 1.2
+    bus: VEH
+    gain_db: -16
+    params: {speed_kmh: 40, disc_whir: 0.5, darken_at: 0.7}
+    width: 1.0
+    fade_in: 0.02
+    fade_out: 0.15
+    until: "f:57"
+    vo_protect: strong
+    sync: {type: cut, frame: 29}
+    notes_es: "Rueda en primer plano: rodado + whir de disco; se apaga cuando la imagen va a negro (f49-52)"
+
+  # ======================================================= 2.29-2.75 ENTRE TORRES (f56-65, hueco VO 2.59-3.39)
+  - id: A060_towers_onboard
+    recipe: veh.onboard_roll
+    at: "f:55"
+    dur: 0.6
+    bus: VEH
+    gain_db: -12
+    params: {speed_kmh: 70, surface: dry, perspective: onboard}
+    width: 1.3
+    fade_in: 0.08
+    fade_out: 0.04
+    until: "cut[1]"
+    send: {preset: city_day_street, db: -8}
+    vo_protect: normal
+    sync: {type: frame, frame: 56}
+    notes_es: "Contrapicado veloz entre torres: aero + rodado onboard, reflexiones (slap) de las fachadas"
+
+  # ======================================================= 2.75-3.17 EX2 DE FRENTE, DETENIDO (f66-75, hueco VO)
+  - id: A065_ex2_front_avas
+    recipe: veh.avas_idle
+    at: "cut[1]-1"
+    dur: 0.6
+    bus: VEH
+    gain_db: -16
+    params: {level: 0.45}
+    width: 0.8
+    fade_in: 0.04
+    fade_out: 0.04
+    until: "cut[2]"
+    vo_protect: none
+    sync: {type: cut, frame: 66}
+    notes_es: "EX2 quieto de frente, faros encendidos: AVAS cercano, dentro del hueco sin locución"
+
+  # ======================================================= 3.17-3.96 PASO ELEVADO, AUTO HACIA CÁMARA
+  - id: A070_overpass_approach
+    recipe: veh.approach
+    at: "f:94"
+    dur: 0.8
+    bus: VEH
+    gain_db: -12
+    params: {speed_kmh: 60, start_m: 25, end_m: 4, surface: dry, ev: 0.4}
+    fade_out: 0.06
+    until: "cut[3]+2"
+    vo_protect: strong
+    sync: {type: frame, frame: 94}
+    notes_es: "EX2 avanza por la avenida vacía y llega a cámara en f94 (último cuadro antes del faro)"
+
+  # ======================================================= 3.96-5.17 FARO EN LA NIEBLA (restricción)
+  - id: A080_headlight_fog_air
+    recipe: amb.fog_air
+    at: "cut[3]-3"
+    dur: 1.4
+    bus: AMB
+    gain_db: -21
+    params: {brightness: 0.4, motion: 0.3}
+    width: 1.4
+    fade_in: 0.12
+    fade_out: 0.05
+    until: "cut[4]"
+    vo_protect: normal
+    sync: {type: free}   # J-cut: cama que entra antes del corte
+    notes_es: "Niebla casi silenciosa alrededor del faro; entra 3 cuadros antes del corte"
+
+  - id: A085_headlight_relay
+    recipe: fol.relay_click
+    at: "cut[3]"
+    dur: 0.3
+    bus: FOL
+    gain_db: -15
+    params: {}
+    pan: -0.1
+    vo_protect: normal
+    sync: {type: cut, frame: 95}
+    notes_es: "Clic de relé muy sutil: el faro aparece encendido justo en el corte"
+
+  # ======================================================= 5.17-6.63 POV INTERIOR, SEMÁFORO ROJO (hueco VO 5.25-6.59)
+  - id: A090_pov_cabin_still
+    recipe: amb.cabin_still
+    at: "cut[4]-3"
+    dur: 1.7
+    bus: AMB
+    gain_db: -12
+    params: {hvac: 0.25, exterior: city_fog}
+    width: 1.1
+    fade_in: 0.12
+    fade_out: 0.05
+    until: "cut[5]+1"
+    vo_protect: normal
+    sync: {type: free}   # J-cut: cama que entra antes del corte
+    notes_es: "Cabina detenida: HVAC + ciudad con niebla a través del vidrio; el mundo respira en el hueco"
+
+  - id: A095_pov_panda_far_steps
+    recipe: cre.panda_steps
+    at: "f:132"
+    dur: 1.4
+    bus: FOL
+    gain_db: -25
+    params: {steps: 3, gait_s: 0.45, surface: wet_asphalt, weight: 0.8}
+    pan: -0.3
+    width: 0.6
+    send: {preset: city_fog_street, db: -6}
+    vo_protect: normal
+    sync: {type: frame, frame: 132}
+    notes_es: "Panda lejano cruzando frente a los faros del otro auto: pasos apenas audibles"
+
+  # ======================================================= 6.63-14.58 CALLE CON NIEBLA (cama continua, con hueco interior en la pata)
+  - id: A100_fog_street_room
+    recipe: amb.room_tone
+    at: "cut[5]-1"
+    dur: 8.1
+    bus: AMB
+    gain_db: -20
+    params: {space: city_fog, air_db: -16, rumble_db: -8}
+    width: 1.3
+    fade_in: 0.05
+    fade_out: 0.06
+    until: "cut[12]"
+    gain_curve: [[0, 0], [0.82, 0], [0.88, -10], [1.5, -10], [1.56, 0], [8.1, 0]]
+    vo_protect: strong
+    sync: {type: cut, frame: 159}
+    notes_es: "Calle con niebla (pandas, EX2, poste): baja 10 dB mientras estamos dentro del auto (pata, f179-194)"
+
+  - id: A105_fog_street_city
+    recipe: amb.city_distant
+    at: "cut[5]-1"
+    dur: 8.1
+    bus: AMB
+    gain_db: -23
+    params: {density: 0.4, lp_hz: 500, passbys: 1, fog: true}
+    width: 1.4
+    fade_in: 0.05
+    fade_out: 0.06
+    until: "cut[12]"
+    gain_curve: [[0, 0], [0.82, 0], [0.88, -8], [1.5, -8], [1.56, 0], [8.1, 0]]
+    vo_protect: strong
+    sync: {type: cut, frame: 159}
+    notes_es: "Wash de ciudad lejana bajo la niebla, mismo recorrido que A100"
+
+  # ----- 6.63-7.46 panda cruzando frente a los faros
+  - id: A110_panda_cross_steps
+    recipe: cre.panda_steps
+    at: "f:168"
+    dur: 0.9
+    bus: FOL
+    gain_db: -13
+    params: {surface: wet_asphalt, weight: 1.0, step_times: [0.0, 0.25]}
+    pan: [[0, -0.1], [0.5, 0.05]]
+    width: 0.7
+    send: {preset: city_fog_street, db: -12}
+    vo_protect: normal
+    sync: {type: frame, frame: 168}
+    notes_es: "Apoyo de la pata trasera cercana en f168 (contacto medido) y lejana en f174"
+
+  - id: A115_panda_cross_breath
+    recipe: cre.panda_breath
+    at: "f:162"
+    dur: 0.8
+    bus: FOL
+    gain_db: -19
+    params: {type: exhale, close: false}
+    pan: -0.1
+    send: {preset: city_fog_street, db: -12}
+    vo_protect: strong
+    sync: {type: frame, frame: 162}
+    notes_es: "Exhalación tranquila del panda mientras camina, a media distancia"
+
+  # ----- 7.46-8.13 pata contra el parabrisas (HERO), desde dentro
+  - id: A120_paw_cabin_still
+    recipe: amb.cabin_still
+    at: "cut[6]-1"
+    dur: 0.85
+    bus: AMB
+    gain_db: -16
+    params: {hvac: 0.2, exterior: city_fog}
+    fade_in: 0.04
+    fade_out: 0.05
+    until: "cut[7]+1"
+    vo_protect: strong
+    sync: {type: cut, frame: 179}
+    notes_es: "Volvemos al interior: HVAC suave detrás de la pata"
+
+  - id: A125_paw_on_glass
+    recipe: cre.paw_on_glass
+    at: "cut[6]"
+    dur: 0.9
+    bus: FOL
+    gain_db: -9
+    params: {press_ms: 210, squeak: 0.35, sniff: true, inside: true}
+    pan: 0.15
+    width: 0.8
+    fade_out: 0.1
+    until: "cut[7]+4"
+    vo_protect: strong
+    sync: {type: cut, frame: 179}
+    notes_es: "HERO: thump modal del vidrio en el corte (la pata ya apoyada), chirrido al deslizar (~f184), olfateo"
+
+  # ----- 8.13-10.54 filas de pandas / EX2 entre pandas
+  - id: A130_panda_crowd
+    recipe: cre.panda_crowd
+    at: "cut[7]-1"
+    dur: 4.3
+    bus: FOL
+    gain_db: -22
+    params: {density: 0.5, distance: mid}
+    width: 1.4
+    fade_in: 0.06
+    fade_out: 0.3
+    until: "cut[10]"
+    gain_curve: [[0, 0], [2.4, 0], [2.6, -7], [4.3, -7]]
+    vo_protect: strong
+    sync: {type: cut, frame: 195}
+    notes_es: "Presencia de cientos de pandas a ambos lados (roces de pelaje, resoplidos lejanos); se aleja en el perfil"
+
+  - id: A135_ex2_between_pandas_avas
+    recipe: veh.avas_idle
+    at: "cut[8]-1"
+    dur: 2.95
+    bus: VEH
+    gain_db: -18
+    params: {level: 0.5}
+    width: 0.8
+    fade_in: 0.08
+    fade_out: 0.1
+    until: "cut[10]"
+    gain_curve: [[0, 0], [1.1, 0], [1.25, -8], [2.95, -8]]
+    vo_protect: normal
+    sync: {type: cut, frame: 226}
+    notes_es: "EX2 avanzando entre las filas (micro-pausa VO 9.22-9.38 justo antes); queda lejano detrás del perfil"
+
+  - id: A140_ex2_between_pandas_glide
+    recipe: veh.wet_glide
+    seed: 5                 # toma elegida: su pico de energía cae en el cuadro de sync
+    at: "f:250"
+    dur: 2.0
+    bus: VEH
+    gain_db: -21
+    params: {speed_kmh: 12, sizzle: 0.5}
+    width: 0.5
+    fade_in: 0.3
+    fade_out: 0.1
+    until: "cut[9]+2"
+    vo_protect: normal
+    sync: {type: frame, frame: 250}
+    notes_es: "Siseo lento de neumáticos en asfalto mojado, muy bajo; más cercano al final del plano (f250)"
+
+  # ----- 10.54-12.29 perfil de panda (hueco VO 10.27-10.94)
+  - id: A145_panda_profile_sniff
+    recipe: cre.panda_breath
+    at: "f:255"
+    dur: 0.6
+    bus: FOL
+    gain_db: -8
+    params: {type: sniff, close: true}
+    pan: 0.1
+    fade_out: 0.12
+    until: "f:266"
+    vo_protect: normal
+    sync: {type: frame, frame: 255}
+    notes_es: "Olfateo cercano del panda en primer plano, dentro del hueco sin locución"
+
+  - id: A150_panda_profile_exhale
+    recipe: cre.panda_breath
+    at: "f:276"
+    dur: 0.8
+    bus: FOL
+    gain_db: -16
+    params: {type: exhale, close: true}
+    pan: 0.1
+    vo_protect: strong
+    sync: {type: frame, frame: 276}
+    notes_es: "Exhalación lenta y cercana, bajo la locución (protección fuerte)"
+
+  # ======================================================= 12.29-14.00 EX2 SE DESLIZA / PASO DE RUEDA (f308) / FOCOS (13.5)
+  - id: A160_glide_wheel_arch
+    recipe: veh.wet_glide
+    seed: 1                 # toma elegida: su pico de energía cae en el cuadro de sync
+    at: "f:312"
+    dur: 1.7
+    bus: VEH
+    gain_db: -10
+    params: {speed_kmh: 20, sizzle: 0.6}
+    fade_in: 0.12
+    fade_out: 0.3
+    vo_protect: strong
+    sync: {type: frame, frame: 312}
+    notes_es: "Deslizamiento sobre asfalto mojado con el paso de rueda más cercano en f312 (13.0 s); nada extra en el reveal 13.5"
+
+  # ======================================================= 14.00-14.58 POSTE + SEMÁFORO PEATONAL (hueco VO 13.18-14.59)
+  - id: A170_ped_signal
+    recipe: fol.ped_signal
+    at: "f:338"
+    dur: 0.5
+    bus: FOL
+    gain_db: -11
+    params: {count: 1, rate_hz: 1.0}
+    pan: 0.3
+    send: {preset: city_fog_street, db: -10}
+    vo_protect: none
+    sync: {type: frame, frame: 338}
+    notes_es: "Un tic del semáforo peatonal en rojo (arriba a la derecha), con la calle mojada de fondo"
+
+  - id: A175_ped_signal_passby
+    recipe: veh.passby
+    seed: 5                 # toma elegida: su pico de energía cae en el cuadro de sync
+    at: "f:343"
+    dur: 0.9
+    bus: VEH
+    gain_db: -11
+    params: {speed_kmh: 18, closest_m: 2.5, direction: -1, surface: wet, ev: 0.4}
+    fade_out: 0.06
+    until: "cut[12]"
+    gain_curve: [[0, -12], [0.15, -12], [0.3, 0]]
+    vo_protect: none
+    sync: {type: frame, frame: 343}
+    notes_es: "El EX2 pasa lento detrás del poste de derecha a izquierda, neumáticos en mojado"
+
+  # ======================================================= 14.58-15.71 AÉREO COSTA (J-cut 4 cuadros, L-cut 6)
+  - id: A180_coast_surf
+    recipe: amb.surf
+    at: "cut[12]-4"
+    dur: 1.6
+    bus: AMB
+    gain_db: -21
+    params: {intensity: 0.6, crest_at: 0.44, distance: far}
+    width: 1.4
+    fade_in: 0.17
+    fade_out: 0.25
+    until: "cut[13]+6"
+    vo_protect: strong
+    sync: {type: free}   # J-cut: cama que entra antes del corte
+    notes_es: "Olas rompiendo al pie del acantilado; cresta a mitad de plano (f363)"
+
+  - id: A185_cliff_wind
+    recipe: amb.wind
+    at: "cut[12]-4"
+    dur: 1.9
+    bus: AMB
+    gain_db: -23
+    params: {strength: 0.5, gustiness: 0.4, whistle: 0.15, texture: none}
+    width: 1.5
+    fade_in: 0.17
+    fade_out: 0.06
+    until: "cut[14]"
+    vo_protect: strong
+    sync: {type: free}   # J-cut: cama que entra antes del corte
+    notes_es: "Viento del acantilado; sigue bajo la curva de grava (misma costa) y termina en el arco"
+
+  # ======================================================= 15.71-16.29 CURVA DE GRAVA MOJADA (hueco VO 15.94-16.35)
+  - id: A190_gravel_curve
+    recipe: veh.gravel_curve
+    seed: 4                 # toma elegida: su pico de energía cae en el cuadro de sync
+    at: "f:385"
+    dur: 1.0
+    bus: VEH
+    gain_db: -11
+    params: {speed_kmh: 25, wet: true}
+    fade_out: 0.06
+    until: "cut[14]+2"
+    gain_curve: [[0, -15], [0.12, -15], [0.2, 0]]
+    vo_protect: strong
+    sync: {type: frame, frame: 385}
+    notes_es: "Grava húmeda crujiendo en la curva, máximo cuando el auto encara a cámara (f385)"
+
+  # ======================================================= 16.29-18.29 ARCO DE ROCA / RUTA OSCURA / HACES
+  - id: A200_rock_arch_passby
+    recipe: veh.passby
+    seed: 5                 # toma elegida: su pico de energía cae en el cuadro de sync
+    at: "f:397"
+    dur: 1.8
+    bus: VEH
+    gain_db: -19
+    params: {speed_kmh: 50, closest_m: 18, direction: 1, surface: dry, ev: 0.3}
+    fade_out: 0.15
+    until: "f:418"
+    gain_curve: [[0, -24], [0.6, -18], [0.75, 0]]
+    send: {preset: rock_arch, db: -5}
+    vo_protect: strong
+    sync: {type: frame, frame: 397}
+    notes_es: "Pass-by lejano visto a través del arco (16.5 s), la roca devuelve la reflexión; sigue en la ruta oscura"
+
+  - id: A205_dark_cliff_wind
+    recipe: amb.wind
+    at: "cut[14]-1"
+    dur: 2.1
+    bus: AMB
+    gain_db: -24
+    params: {strength: 0.3, gustiness: 0.3, whistle: 0.1, texture: none}
+    width: 1.5
+    fade_in: 0.06
+    fade_out: 0.06
+    until: "cut[15]"
+    send: {preset: rock_arch, db: -12}
+    vo_protect: strong
+    sync: {type: cut, frame: 391}
+    notes_es: "Aire frío y oscuro del acantilado"
+
+  - id: A210_headlights_approach
+    recipe: veh.approach
+    at: "f:437"
+    dur: 0.9
+    bus: VEH
+    gain_db: -13
+    params: {speed_kmh: 40, start_m: 40, end_m: 12, surface: dry, ev: 0.4}
+    fade_out: 0.06
+    until: "cut[15]+2"
+    vo_protect: strong
+    sync: {type: frame, frame: 437}
+    notes_es: "Haces de faros acercándose con el destello (17.5-18.2)"
+
+  # ======================================================= 18.29-19.29 VALLE (hueco VO 18.91-19.23)
+  - id: A220_valley_wind
+    recipe: amb.mountain_wind
+    at: "cut[15]-3"
+    dur: 1.25
+    bus: AMB
+    gain_db: -18
+    params: {strength: 0.4, river: 0.2, echo: true}
+    width: 1.5
+    fade_in: 0.12
+    fade_out: 0.06
+    until: "cut[16]+1"
+    vo_protect: strong
+    sync: {type: free}   # J-cut: cama que entra antes del corte
+    notes_es: "Viento suave de valle con ecos; auto diminuto abajo"
+
+  - id: A225_valley_raptor
+    recipe: amb.birds_distant
+    at: "f:455"
+    dur: 0.8
+    bus: AMB
+    gain_db: -12
+    params: {count: 1, species: raptor}
+    pan: 0.45
+    vo_protect: normal
+    sync: {type: frame, frame: 455}
+    notes_es: "Un ave rapaz lejana en el hueco sin locución, con eco de valle"
+
+  # ======================================================= 19.29-22.46 INTERIOR MANEJANDO (EV silencioso)
+  - id: A230_interior_cabin
+    recipe: amb.cabin
+    at: "cut[16]-1"
+    dur: 3.25
+    bus: AMB
+    gain_db: -24
+    params: {speed_kmh: 60, road: 0.4, hvac: 0.25, pillar_wind: 0.3}
+    width: 1.1
+    fade_in: 0.05
+    fade_out: 0.05
+    until: "cut[17]"
+    vo_protect: strong
+    sync: {type: cut, frame: 463}
+    notes_es: "Cabina EV en marcha: rodado sordo, HVAC, viento de pilar; casi nada (sin sonidos vocales)"
+
+  - id: A235_interior_suspension
+    recipe: fol.suspension
+    at: "f:497"
+    dur: 0.5
+    bus: FOL
+    gain_db: -15
+    params: {}
+    vo_protect: normal
+    sync: {type: frame, frame: 497}
+    notes_es: "Un golpe sordo de suspensión (junta del camino) a mitad del plano"
+
+  # ======================================================= 22.46-23.63 EX2 EN LA OSCURIDAD (hueco VO 22.34-22.78)
+  - id: A240_dark_fog_air
+    recipe: amb.fog_air
+    at: "cut[17]-1"
+    dur: 1.3
+    bus: AMB
+    gain_db: -20
+    params: {brightness: 0.35, motion: 0.3}
+    width: 1.4
+    fade_in: 0.05
+    fade_out: 0.06
+    until: "cut[18]+1"
+    vo_protect: normal
+    sync: {type: cut, frame: 539}
+    notes_es: "Niebla en la oscuridad alrededor del EX2"
+
+  - id: A245_dark_ex2_avas
+    recipe: veh.avas_idle
+    at: "cut[17]"
+    dur: 1.3
+    bus: VEH
+    gain_db: -14
+    params: {level: 0.4}
+    width: 0.8
+    fade_in: 0.08
+    fade_out: 0.06
+    until: "cut[18]+1"
+    vo_protect: normal
+    sync: {type: cut, frame: 539}
+    notes_es: "EX2 detenido, listo: AVAS suave"
+
+  # ======================================================= 23.63-25.21 EX5 HAZ CENITAL (estudio)
+  - id: A250_studio_room
+    recipe: amb.studio
+    at: "cut[18]"
+    dur: 1.7
+    bus: AMB
+    gain_db: -20
+    params: {hum: 0.3}
+    width: 1.3
+    fade_in: 0.03
+    fade_out: 0.06
+    until: "cut[19]+1"
+    vo_protect: strong
+    sync: {type: cut, frame: 567}
+    notes_es: "Escenario grande y vacío: aire + zumbido mínimo de lámparas"
+
+  - id: A255_light_contactor
+    recipe: fol.light_contactor
+    at: "cut[18]"
+    dur: 1.5
+    bus: FOL
+    gain_db: -11
+    params: {hum: 0.5}
+    fade_out: 0.1
+    until: "cut[19]"
+    vo_protect: normal
+    sync: {type: cut, frame: 567}
+    notes_es: "Contactor de luz de estudio en el cuadro exacto en que se enciende el haz (f567, imagen sobreexpuesta)"
+
+  # ======================================================= 25.21-25.46 RUTA OSCURA, FAROS VELOCES
+  - id: A260_dark_road_passby
+    recipe: veh.passby
+    at: "cut[20]"
+    dur: 1.0
+    bus: VEH
+    gain_db: -13
+    params: {speed_kmh: 90, closest_m: 2.0, direction: 1, surface: wet, ev: 0.4}
+    fade_out: 0.2
+    until: "cut[20]+6"
+    gain_curve: [[0, -20], [0.19, -20], [0.25, 0]]
+    vo_protect: normal
+    sync: {type: cut, frame: 611}
+    notes_es: "Los faros se acercan rápido y el auto pasa la cámara justo en el corte al desierto"
+
+  # ======================================================= 25.46-26.33 AÉREO DESIERTO (hueco VO 25.47-26.43)
+  - id: A270_desert_wind
+    recipe: amb.desert_wind
+    at: "cut[20]-3"
+    dur: 1.2
+    bus: AMB
+    gain_db: -14
+    params: {strength: 0.45, sand: 0.4}
+    width: 1.5
+    fade_in: 0.12
+    fade_out: 0.12
+    until: "cut[21]+3"
+    vo_protect: normal
+    sync: {type: free}   # J-cut: cama que entra antes del corte
+    notes_es: "Viento seco con arena; L-cut 3 cuadros dentro del interior (el desierto sigue tras el vidrio)"
+
+  - id: A275_desert_rock_gust
+    recipe: amb.wind
+    at: "f:610"
+    dur: 0.9
+    bus: AMB
+    gain_db: -12
+    params: {strength: 0.6, gustiness: 0.8, whistle: 0.1, texture: sand}
+    pan: [[0, 0.5], [0.3, 0.0], [0.6, -0.6]]
+    width: 1.2
+    fade_in: 0.05
+    fade_out: 0.2
+    gain_curve: [[0, -14], [0.29, 0], [0.75, -12]]
+    vo_protect: normal
+    sync: {type: frame, frame: 610}
+    notes_es: "Ráfaga natural cuando la cámara roza la roca en primer plano (máximo f617), sale por la izquierda"
+
+  # ======================================================= 26.33-28.08 TIRA LED + PARLANTE (aire de cabina)
+  - id: A280_led_cabin_air
+    recipe: amb.cabin
+    at: "cut[21]-1"
+    dur: 1.85
+    bus: AMB
+    gain_db: -23
+    params: {speed_kmh: 40, road: 0.25, hvac: 0.35, pillar_wind: 0.15}
+    width: 1.1
+    fade_in: 0.05
+    fade_out: 0.05
+    until: "cut[23]"
+    vo_protect: strong
+    sync: {type: cut, frame: 632}
+    notes_es: "Aire de cabina; en el parlante (f659-673) no se agrega nada: es de la música"
+
+  - id: A285_led_fizz
+    recipe: fol.led_fizz
+    at: "cut[21]"
+    dur: 1.15
+    bus: FOL
+    gain_db: -19
+    params: {}
+    pan: [[0, -0.5], [1.1, 0.5]]
+    fade_out: 0.1
+    until: "cut[22]"
+    vo_protect: normal
+    sync: {type: cut, frame: 632}
+    notes_es: "Fizz finísimo de la tira LED, siguiendo el travelling de izquierda a derecha"
+
+  # ======================================================= 28.08-29.08 AÉREO BOSQUE
+  - id: A290_forest_aerial
+    recipe: amb.forest
+    at: "cut[23]-3"
+    dur: 1.3
+    bus: AMB
+    gain_db: -18
+    params: {rustle: 0.5, birds: 1, wind: 0.35}
+    width: 1.4
+    fade_in: 0.12
+    fade_out: 0.12
+    until: "cut[24]+3"
+    vo_protect: strong
+    sync: {type: free}   # J-cut: cama que entra antes del corte
+    notes_es: "Copas de árboles con viento y un pájaro lejano; cruza 3 cuadros con el frío del volcán"
+
+  # ======================================================= 29.08-30.29 EX5 HACIA CÁMARA, VOLCÁN (hueco VO desde 30.08)
+  - id: A300_volcano_cold_air
+    recipe: amb.alpine
+    at: "cut[24]-1"
+    dur: 1.35
+    bus: AMB
+    gain_db: -25
+    params: {strength: 0.4}
+    width: 1.5
+    fade_in: 0.06
+    fade_out: 0.06
+    until: "cut[25]+1"
+    vo_protect: strong
+    sync: {type: cut, frame: 698}
+    notes_es: "Aire frío de montaña con el volcán nevado detrás"
+
+  - id: A305_volcano_approach
+    recipe: veh.approach
+    at: "f:726"
+    dur: 1.15
+    bus: VEH
+    gain_db: -17
+    params: {speed_kmh: 45, start_m: 30, end_m: 7, surface: dry, ev: 0.4}
+    fade_out: 0.06
+    until: "cut[25]+2"
+    vo_protect: strong
+    sync: {type: frame, frame: 726}
+    notes_es: "EX5 avanza hacia cámara: rodado y aire, sin motor"
+
+  # ======================================================= 30.29-31.58 CAMINO JUNTO AL LAGO (hueco VO 30.08-30.88) + SELECTOR
+  - id: A310_lake_shore
+    recipe: amb.lake
+    at: "cut[25]-2"
+    dur: 1.0
+    bus: AMB
+    gain_db: -14
+    params: {lap: 0.45, wind: 0.25}
+    width: 1.4
+    fade_in: 0.06
+    fade_out: 0.05
+    until: "f:747"
+    vo_protect: normal
+    sync: {type: free}   # J-cut 2 cuadros
+    notes_es: "Orilla del lago al atardecer: chapoteo suave + brisa, en el hueco sin locución"
+
+  - id: A315_lake_far_roll
+    recipe: veh.onboard_roll
+    at: "cut[25]"
+    dur: 0.9
+    bus: VEH
+    gain_db: -21
+    params: {speed_kmh: 50, surface: dry, perspective: far}
+    fade_in: 0.08
+    fade_out: 0.05
+    until: "f:747"
+    vo_protect: normal
+    sync: {type: cut, frame: 727}
+    notes_es: "Rodado lejano del EX5 en el camino costero"
+
+  - id: A320_console_cabin
+    recipe: amb.cabin
+    at: "f:746"
+    dur: 0.55
+    bus: AMB
+    gain_db: -20
+    params: {speed_kmh: 50, road: 0.35, hvac: 0.3, pillar_wind: 0.2}
+    fade_in: 0.04
+    fade_out: 0.05
+    until: "cut[26]"
+    vo_protect: normal
+    sync: {type: frame, frame: 747}
+    notes_es: "Interior en la consola (sub-corte f747)"
+
+  - id: A325_gear_selector
+    recipe: fol.gear_selector
+    at: "f:748"
+    dur: 0.4
+    bus: FOL
+    gain_db: -9
+    params: {style: rotary}
+    pan: 0.1
+    vo_protect: normal
+    sync: {type: frame, frame: 748}
+    notes_es: "Detent preciso del selector rotativo de cristal de la consola, al abrir el plano de la mano"
+
+  # ======================================================= 31.58-33.37 BOSQUE: PASS-BY LEJANO + EX5 DE FRENTE
+  - id: A330_forest_bed
+    recipe: amb.forest
+    at: "cut[26]-1"
+    dur: 1.9
+    bus: AMB
+    gain_db: -21
+    params: {rustle: 0.4, birds: 1, wind: 0.3}
+    width: 1.4
+    fade_in: 0.05
+    fade_out: 0.04
+    until: "f:801"
+    vo_protect: normal
+    sync: {type: cut, frame: 758}
+    notes_es: "Bosque de pinos a contraluz"
+
+  - id: A335_forest_far_passby
+    recipe: veh.passby
+    seed: 4                 # toma elegida: su pico de energía cae en el cuadro de sync
+    at: "f:764"
+    dur: 1.0
+    bus: VEH
+    gain_db: -14
+    params: {speed_kmh: 60, closest_m: 12, direction: -1, surface: dry, ev: 0.3}
+    fade_out: 0.06
+    until: "f:771"
+    send: {preset: forest, db: -8}
+    vo_protect: strong
+    sync: {type: frame, frame: 764}
+    notes_es: "Contrapicado: el auto pasa arriba entre los troncos, con el bosque como espacio"
+
+  - id: A340_forest_tracking_roll
+    recipe: veh.onboard_roll
+    at: "f:770"
+    dur: 1.3
+    bus: VEH
+    gain_db: -18
+    params: {speed_kmh: 60, surface: dry, perspective: close}
+    fade_in: 0.05
+    fade_out: 0.04
+    until: "f:801"
+    vo_protect: strong
+    sync: {type: frame, frame: 771}
+    notes_es: "Travelling frontal del EX5 por el bosque: rodado cercano"
+
+  - id: A345_forest_close_passby
+    recipe: veh.passby
+    at: "f:799"
+    dur: 1.0
+    bus: VEH
+    gain_db: -14
+    params: {speed_kmh: 60, closest_m: 2.0, direction: 1, surface: dry, ev: 0.4}
+    fade_out: 0.04
+    until: "f:801"
+    vo_protect: strong
+    sync: {type: frame, frame: 799}
+    notes_es: "El EX5 roza la cámara (f796-800) y corta seco al plano de ciudad"
+
+  # ======================================================= 33.37-35.33 CIUDAD: DESDE OTRO AUTO + CAPÓ (hueco VO 34.72-35.23)
+  - id: A350_city_other_car_cabin
+    recipe: amb.cabin
+    at: "f:800"
+    dur: 1.6
+    bus: AMB
+    gain_db: -20
+    params: {speed_kmh: 50, road: 0.45, hvac: 0.2, pillar_wind: 0.35}
+    width: 1.1
+    fade_in: 0.04
+    fade_out: 0.05
+    until: "f:838"
+    vo_protect: strong
+    sync: {type: frame, frame: 801}
+    notes_es: "Interior del otro auto en la ciudad (vemos al EX2 a través del parabrisas y la ventana)"
+
+  - id: A355_city_ex2_alongside
+    recipe: veh.passby
+    seed: 6                 # toma elegida: su pico de energía cae en el cuadro de sync
+    at: "f:818"
+    dur: 1.4
+    bus: VEH
+    gain_db: -18
+    params: {speed_kmh: 25, closest_m: 2.5, direction: -1, surface: dry, ev: 0.4}
+    fade_out: 0.1
+    until: "f:838"
+    send: {preset: cabin_small, db: -10}
+    vo_protect: strong
+    sync: {type: frame, frame: 818}
+    notes_es: "El EX2 pasa al lado (34.0-34.5), escuchado amortiguado desde el otro auto"
+
+  - id: A360_hood_wind
+    recipe: veh.onboard_roll
+    at: "f:837"
+    dur: 0.5
+    bus: VEH
+    gain_db: -14
+    params: {speed_kmh: 60, surface: dry, perspective: onboard}
+    width: 1.3
+    fade_in: 0.04
+    fade_out: 0.04
+    until: "cut[28]"
+    vo_protect: normal
+    sync: {type: frame, frame: 838}
+    notes_es: "Capó cercano (35.0): viento y rodado onboard en el hueco sin locución"
+
+  # ======================================================= 35.33-35.75 EX2 SALE DEL ARCO AL ATARDECER
+  - id: A365_sunset_arch_approach
+    recipe: veh.approach
+    at: "f:857"
+    dur: 0.45
+    bus: VEH
+    gain_db: -18
+    params: {speed_kmh: 40, start_m: 20, end_m: 9, surface: dry, ev: 0.4}
+    fade_out: 0.04
+    until: "cut[29]"
+    send: {preset: rock_arch, db: -12}
+    vo_protect: strong
+    sync: {type: frame, frame: 857}
+    notes_es: "Cola corta de rodado: el EX2 sale de la roca hacia el sol"
+
+  # ======================================================= 35.75-36.88 NIEVE + MONTAÑAS
+  - id: A370_alpine_air
+    recipe: amb.alpine
+    at: "cut[29]-3"
+    dur: 1.3
+    bus: AMB
+    gain_db: -23
+    params: {strength: 0.45}
+    width: 1.5
+    fade_in: 0.12
+    fade_out: 0.05
+    until: "cut[31]"
+    vo_protect: strong
+    sync: {type: free}   # J-cut: cama que entra antes del corte
+    notes_es: "Silencio frío de nieve y viento de altura (nieve y ruta de montaña)"
+
+  - id: A380_snow_spray
+    recipe: veh.snow_spray
+    at: "f:859"
+    dur: 0.8
+    bus: VEH
+    gain_db: -11
+    params: {intensity: 0.9}
+    pan: 0.2
+    fade_out: 0.06
+    until: "cut[30]+1"
+    vo_protect: normal
+    sync: {type: frame, frame: 859}
+    notes_es: "La rueda levanta nieve (spray máximo f859-866): crunch + partículas"
+
+  - id: A385_mountain_road_passby
+    recipe: veh.passby
+    at: "f:881"
+    dur: 1.1
+    bus: VEH
+    gain_db: -17
+    params: {speed_kmh: 55, closest_m: 2.5, direction: -1, surface: dry, ev: 0.4}
+    fade_out: 0.05
+    until: "cut[31]"
+    gain_curve: [[0, -18], [0.17, -18], [0.25, 0]]
+    vo_protect: strong
+    sync: {type: frame, frame: 881}
+    notes_es: "En la ruta con montañas nevadas el EX2 pasa pegado a cámara de derecha a izquierda (f879-883)"
+
+  # ======================================================= 36.88-37.83 GANSOS POR EL TECHO PANORÁMICO
+  - id: A390_sunroof_cabin
+    recipe: amb.cabin
+    at: "cut[31]-1"
+    dur: 1.05
+    bus: AMB
+    gain_db: -22
+    params: {speed_kmh: 50, road: 0.3, hvac: 0.25, pillar_wind: 0.2}
+    fade_in: 0.04
+    fade_out: 0.05
+    until: "cut[32]"
+    vo_protect: strong
+    sync: {type: cut, frame: 885}
+    notes_es: "Interior bajo el techo de vidrio"
+
+  - id: A395_geese_flyover
+    recipe: cre.geese_flyover
+    at: "cut[31]"
+    dur: 1.2
+    bus: FOL
+    gain_db: -14
+    params: {birds: 8, honks: 2, through_glass: 0.5}
+    pan: [[0, -0.3], [1.0, 0.3]]
+    width: 1.3
+    fade_out: 0.12
+    until: "cut[32]+3"
+    vo_protect: strong
+    sync: {type: cut, frame: 885}
+    notes_es: "Bandada de gansos: aleteos y dos graznidos escasos, apagados por el vidrio"
+
+  # ======================================================= 37.83-38.54 AÉREO BOSQUE/LAGO: nada (0.7 s bajo música y locución;
+  #                                                         los gansos se apagan 3 cuadros después del corte)
+
+  # ======================================================= 38.54-39.92 INTERIOR CON PANTALLA
+  - id: A410_screen_cabin
+    recipe: amb.cabin
+    at: "cut[33]-1"
+    dur: 1.45
+    bus: AMB
+    gain_db: -20
+    params: {speed_kmh: 50, road: 0.35, hvac: 0.3, pillar_wind: 0.25}
+    width: 1.1
+    fade_in: 0.04
+    fade_out: 0.05
+    until: "cut[34]"
+    vo_protect: strong
+    sync: {type: cut, frame: 925}
+    notes_es: "Cabina del EX5 con la gran pantalla (ningún dedo la toca: sin toque de pantalla)"
+
+  # ======================================================= 39.92-42.58 TORRES DEL PAINE + CELULAR + PORTÓN
+  - id: A420_paine_wind
+    recipe: amb.mountain_wind
+    at: "cut[34]-3"
+    dur: 2.85
+    bus: AMB
+    gain_db: -17
+    params: {strength: 0.55, river: 0.25, echo: true}
+    width: 1.5
+    fade_in: 0.12
+    fade_out: 0.04
+    until: "cut[36]"
+    vo_protect: strong
+    sync: {type: free}   # J-cut: cama que entra antes del corte
+    notes_es: "Viento patagónico abierto, río lejano; corta seco al túnel"
+
+  - id: A425_phone_shutter
+    recipe: fol.phone_shutter
+    at: "f:983"
+    dur: 0.4
+    bus: FOL
+    gain_db: -11
+    params: {style: modern}
+    pan: -0.45
+    vo_protect: normal
+    sync: {type: frame, frame: 983}
+    notes_es: "Obturador del celular cuando el encuadre se estabiliza (f977-988), antes de bajar el teléfono"
+
+  - id: A430_tailgate_close
+    recipe: fol.tailgate_close
+    at: "f:1021"
+    dur: 1.6
+    bus: FOL
+    gain_db: -10
+    params: {motor_s: 1.33, latch: true}
+    pan: 0.6
+    fade_out: 0.1
+    until: "cut[36]+4"
+    vo_protect: normal
+    sync: {type: frame, frame: 1021}
+    notes_es: "Portón eléctrico: motor desde f989 (empieza a bajar) y cierre en f1021, en la micro-pausa VO 42.50-42.62"
+
+  # ======================================================= 42.58-43.92 TÚNEL (hueco VO 42.85-43.49)
+  - id: A440_tunnel_room
+    recipe: amb.tunnel
+    at: "cut[36]-1"
+    dur: 1.6
+    bus: AMB
+    gain_db: -14
+    params: {fans: 0.4, drip: 0.2}
+    width: 1.3
+    fade_in: 0.04
+    fade_out: 0.17
+    until: "cut[37]+4"
+    vo_protect: normal
+    sync: {type: cut, frame: 1022}
+    notes_es: "Túnel oscuro: ventiladores, goteo, reverb larga; L-cut 4 cuadros en el destello blanco"
+
+  - id: A445_tunnel_passby
+    recipe: veh.tunnel_passby
+    at: "f:1041"
+    dur: 2.0
+    bus: VEH
+    gain_db: -10
+    params: {speed_kmh: 50, wet: true}
+    fade_out: 0.17
+    until: "cut[37]+4"
+    gain_curve: [[0, -18], [0.2, -18], [0.35, 0]]
+    vo_protect: normal
+    sync: {type: frame, frame: 1041}
+    notes_es: "EX5 cruza el túnel de izquierda a derecha, más cercano en f1041"
+
+  - id: A450_tunnel_water_splash
+    recipe: veh.water_splash
+    at: "f:1031"
+    dur: 0.9
+    bus: VEH
+    gain_db: -9
+    params: {intensity: 0.8, space: tunnel}
+    pan: [[0, -0.25], [0.6, 0.35]]
+    fade_out: 0.17
+    until: "cut[37]+4"
+    vo_protect: normal
+    sync: {type: frame, frame: 1031}
+    notes_es: "La rueda pisa el agua (primera nube de spray f1031) dentro del hueco sin locución"
+
+  # ======================================================= 43.92-46.83 PLACA FINAL: nada (la música manda)
+
+  # ======================================================= 46.83-48.58 REMATE: PANDA EN CALLE VACÍA DE DÍA (sin música)
+  - id: A500_stinger_city_day
+    recipe: amb.empty_city_day
+    at: "cut[39]-4"
+    dur: 3.1
+    bus: AMB
+    gain_db: -8
+    params: {traffic: 0.25, birds: 1, wind: 0.2}
+    width: 1.3
+    fade_in: 0.17
+    fade_out: 0.005
+    until: "f:1193"
+    gain_curve: [[0, 0], [1.9, 0], [2.0, -3], [3.1, -3]]
+    vo_protect: none
+    sync: {type: free}   # J-cut: cama que entra antes del corte
+    notes_es: "Calle vacía de día: tráfico muy lejano, brisa; entra 4 cuadros antes del corte y baja 5 dB en el EX2"
+
+  - id: A505_stinger_panda_steps
+    recipe: cre.panda_steps
+    at: "f:1125"
+    dur: 1.9
+    bus: FOL
+    gain_db: -11
+    params: {surface: dry_asphalt, weight: 1.0, step_times: [0.0, 0.4583, 1.4583]}
+    pan: [[0, -0.2], [1.5, -0.05]]
+    width: 0.8
+    send: {preset: city_day_street, db: -14}
+    fade_out: 0.1
+    until: "cut[40]+3"
+    vo_protect: none
+    sync: {type: frame, frame: 1125}
+    notes_es: "Pasos medidos en el contacto con el suelo: trasera f1125, trasera lejana f1136, delantera f1160"
+
+  - id: A510_stinger_panda_sniff
+    recipe: cre.panda_breath
+    at: "f:1146"
+    dur: 0.6
+    bus: FOL
+    gain_db: -11
+    params: {type: sniff, close: false}
+    pan: -0.1
+    send: {preset: city_day_street, db: -14}
+    fade_out: 0.1
+    until: "f:1165"
+    vo_protect: none
+    sync: {type: frame, frame: 1146}
+    notes_es: "Un olfateo a media distancia entre el segundo y el tercer paso"
+
+  - id: A515_stinger_small_birds
+    recipe: cre.small_birds
+    at: "f:1130"
+    dur: 1.8
+    bus: FOL
+    gain_db: -18
+    params: {count: 2}
+    pan: 0.5
+    width: 1.3
+    fade_out: 0.2
+    until: "cut[40]+4"
+    vo_protect: none
+    sync: {type: frame, frame: 1130}
+    notes_es: "Gorriones en los árboles de la vereda derecha, escasos"
+
+  # ======================================================= 48.58-49.71 EX2 MOJADO EN PRIMER PLANO -> CORTE A SILENCIO
+  - id: A520_stinger_droplets
+    recipe: fol.droplets
+    at: "cut[40]"
+    dur: 1.2
+    bus: FOL
+    gain_db: -12
+    params: {rate: 5.0, surface: metal}
+    width: 1.3
+    fade_out: 0.005
+    until: "f:1193"
+    vo_protect: none
+    sync: {type: cut, frame: 1166}
+    notes_es: "Gotas que escurren sobre el capó mojado, muy cerca"
+
+  - id: A525_stinger_ex2_avas
+    recipe: veh.avas_idle
+    at: "cut[40]-1"
+    dur: 1.25
+    bus: VEH
+    gain_db: -11
+    params: {level: 0.4}
+    width: 0.9
+    fade_in: 0.06
+    fade_out: 0.005
+    until: "f:1193"
+    vo_protect: none
+    sync: {type: cut, frame: 1166}
+    notes_es: "AVAS del EX2 cercano, faros encendidos; corte duro a silencio en 49.708 s"
