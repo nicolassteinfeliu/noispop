@@ -336,11 +336,36 @@ def _bubble_soft(f0, tau, n, glide=0.2):
     return y
 
 
-def _drop(rng, f0, tau, glide, hard=False):
-    """Una gota: burbuja Minnaert (f sube al aflorar) + tic de impacto, o 'splat' sobre superficie dura."""
+def _splash(f0, tau, glide, L, energy_db):
+    """Corona de salpicadura del impacto de la gota en el charco (ruido 1.2-9 kHz, 2-5 ms, + 1-3 gotitas
+    secundarias). Ruido de un generador local sembrado con los valores ya sorteados (f0, tau, glide): no
+    consume el rng del cue, así los tiempos de goteo de cada semilla no cambian. energy_db = energía
+    relativa a la de la burbuja (que con tau corto ya no domina la cola de la reverb como un tono fijo)."""
+    lr = np.random.default_rng(int(abs(f0 * 7919.0 + tau * 1.3e7 + glide * 9.1e4)) % (2 ** 32))
+    tt = np.arange(L) / SR
+    tk = lr.uniform(0.002, 0.005)
+    y = dsp.bp(lr.standard_normal(L), 1200.0, 9000.0, 2) * np.exp(-tt / tk)
+    ka = max(2, int(0.0003 * SR))
+    y[:ka] *= np.linspace(0.0, 1.0, ka)
+    for _ in range(int(lr.integers(1, 4))):
+        k = int(lr.uniform(0.006, 0.03) * SR)
+        m = int(0.003 * SR)
+        if k + m < L:
+            y[k:k + m] += lr.uniform(0.2, 0.5) * dsp.hp(lr.standard_normal(m), 2500, 2) * np.hanning(m)
+    e_b = 0.25 * tau                            # energía de un seno amortiguado de amplitud 1
+    return y * np.sqrt(e_b * 10 ** (energy_db / 10) / (np.sum(y ** 2) / SR + 1e-20))
+
+
+def _drop(rng, f0, tau, glide, hard=False, splash_db=None):
+    """Una gota: burbuja Minnaert (f sube al aflorar) + tic de impacto, o 'splat' sobre superficie dura.
+    splash_db (opcional): agrega la corona de salpicadura con esa energía relativa a la burbuja."""
     if not hard:
         L = int((6.5 * tau + 0.003) * SR)
+        if splash_db is not None:
+            L = max(L, int(0.035 * SR))
         y = dsp.bubble(f0, tau, L, glide, rng)
+        if splash_db is not None:
+            y = y + _splash(f0, tau, glide, L, splash_db)
         if rng.random() < 0.35:  # segunda burbujita (salpicadura que vuelve a caer)
             k = int(rng.uniform(0.012, 0.04) * SR)
             t2 = rng.uniform(0.5, 0.9) * tau
@@ -361,6 +386,18 @@ def _drop(rng, f0, tau, glide, hard=False):
     return dsp.fade(y, 0.0004, 0.002)
 
 
+_DRIP_TAU_MAX = 0.0065   # s: el tono de la burbuja muere en <= ~30 ms (-40 dB) antes de la reverb
+_DRIP_SPLASH_DB = -4.0  # energía de la corona de salpicadura re la burbuja (gota que cae 3-5 m a un charco)
+
+
+def _drip_tau(tau_draw, f0):
+    """Amortiguamiento físico de la burbuja de Minnaert de una gota (r ~ 1-2.5 mm): Q = pi f tau ~ 15-40,
+    o sea tau ~ 2.5-6.5 ms a 1.5-3.5 kHz. El sorteo histórico (8-26 ms, Q ~ 40-160) dejaba un tono casi puro
+    que la reverb del espacio sostenía 0.5-1 s como una línea fija (~2 kHz). Se conserva el sorteo del rng
+    (mismos tiempos/semillas) y se mapea a ~0.36x, con tope absoluto y tope Q <= 40."""
+    return float(min(0.36 * tau_draw, _DRIP_TAU_MAX, 40.0 / (np.pi * max(f0, 300.0))))
+
+
 def _drips_layer(N, rng, *, rate=1.0, pitch=1.0, dist=0.5, t_start=0.0, t_vis=None):
     """Goteo: 1-6 fuentes cuasi periódicas (cada una con su pan, distancia, altura de gota) + algunas
     gotas aleatorias. Devuelve (direct [N,2], send [N,2]) para alimentar la reverb aparte."""
@@ -373,7 +410,7 @@ def _drips_layer(N, rng, *, rate=1.0, pitch=1.0, dist=0.5, t_start=0.0, t_vis=No
     def place(t, f0, tau, glide, pn, d, hard):
         if t_vis is not None and -0.005 <= t - t_vis < 0.04:  # no cortar un ataque con el fade-in
             t = t_vis + rng.uniform(0.045, 0.09)
-        y = _drop(rng, f0, tau, glide, hard)
+        y = _drop(rng, f0, _drip_tau(tau, f0), glide, hard, splash_db=_DRIP_SPLASH_DB)
         g = 1.0 / (1.0 + 3.0 * d)
         y = dsp.lp(y, 13000 * (1 - 0.7 * d), 2)
         st = dsp.pan(y, pn)
@@ -683,10 +720,10 @@ def _tonal_hint(N, rng, t0, *, level=1.0):
 # ====================================================================== pájaros
 
 def _bird_note(rng, pts, dur_s, *, harm=(1.0, 0.15, 0.04), trill_hz=0.0, trill_depth=0.0, rough=0.0,
-               att=0.006, breath=0.03, shape="smooth"):
+               att=0.006, breath=0.03, shape="smooth", jitter=0.004, jitter_band=(5.0, 40.0)):
     n = max(16, int(dur_s * SR))
     tt = np.arange(n) / SR
-    fcur = dsp.curve(pts, n, shape) * (1 + _mod(n, rng, 5.0, 40.0, 0.004))
+    fcur = dsp.curve(pts, n, shape) * (1 + _mod(n, rng, jitter_band[0], jitter_band[1], jitter))
     if trill_hz:
         fcur = fcur + trill_depth * np.sin(2 * np.pi * trill_hz * (1 + 0.05 * _mod(n, rng, 1, 8, 1.0)) * tt
                                            + rng.uniform(0, 6.28))
@@ -776,25 +813,40 @@ def _songbird_phrase(rng):
     return np.concatenate(parts)
 
 
-def _raptor_cry(rng):
-    """Rapaz muy lejana: grito descendente áspero (~3.3 -> 1.9 kHz), 1-2 veces."""
-    parts = []
-    for i in range(int(rng.integers(1, 3))):
-        d = rng.uniform(0.7, 1.15) * (1.0 if i == 0 else 0.8)
-        f_hi = rng.uniform(3000, 3500)
-        pts = [(0, f_hi * 0.8), (0.12, f_hi), (0.4, f_hi * 0.88), (1.0, rng.uniform(1800, 2100))]
-        y = _bird_note(rng, pts, d, harm=(1.0, 0.45, 0.25, 0.12, 0.06), rough=0.35, att=0.04, breath=0.08)
-        parts.append(y)
-        parts.append(np.zeros(int(rng.uniform(0.35, 0.8) * SR)))
-    return np.concatenate(parts)
+def _raptor_cry(rng, max_len=None):
+    """Rapaz muy lejana: UN grito descendente áspero (~3.3 -> 1.9 kHz) de 0.7-1.15 s, acortado a `max_len`
+    (s, mínimo 0.3) para que termine dentro de la duración útil del cue. Aspereza (un FM armónico limpio se
+    lee como silbido): jitter rápido de pitch (±1.2 %, 20-150 Hz) que ensancha los armónicos, AM irregular
+    20-70 Hz (rough 0.6) + banda de ruido 1.5-4 kHz modulada a 30-60 Hz con la envolvente del grito
+    (relación armónico/ruido ~4-7 dB)."""
+    d = rng.uniform(0.7, 1.15)
+    if max_len is not None:
+        d = float(min(d, max(0.3, max_len)))
+    f_hi = rng.uniform(3000, 3500)
+    pts = [(0, f_hi * 0.8), (0.12, f_hi), (0.4, f_hi * 0.88), (1.0, rng.uniform(1800, 2100))]
+    y = _bird_note(rng, pts, d, harm=(1.0, 0.45, 0.25, 0.12, 0.06), rough=0.6, att=0.04, breath=0.08,
+                   jitter=0.012, jitter_band=(20.0, 150.0))     # jitter rápido: ensancha los armónicos (aspereza)
+    n = len(y)
+    env = dsp.curve([(0, 0), (min(0.04 / d, 0.4), 1), (0.55, 0.8), (1, 0)], n, "smooth")
+    f_am = rng.uniform(30.0, 60.0) * (1.0 + _mod(n, rng, 0.5, 4.0, 0.15))
+    am = 0.5 + 0.5 * np.sin(2 * np.pi * np.cumsum(f_am) / SR + rng.uniform(0, 6.28))
+    rasp = dsp.bp(rng.standard_normal(n), 1500.0, 4000.0, 4) * env * (0.3 + 0.7 * am)
+    rasp *= _db(rng.uniform(-7.0, -4.0)) * _rms(y) / _rms(rasp)
+    return dsp.fade(y + rasp, 0.004, 0.03)
 
 
-def _bird_track(N, rng, times, *, species="generic", dist=(40.0, 150.0), lp_ref=4000.0, pans=None, birds=None):
+def _bird_track(N, rng, times, *, species="generic", dist=(40.0, 150.0), lp_ref=4000.0, pans=None, birds=None,
+                fit=False, fit_fade=0.08):
     """Coloca llamadas de pájaro en [N,2] con distancia (nivel 1/r + absorción del aire). birds: id de pájaro
-    por llamada (el mismo pájaro conserva posición, distancia y registro). Devuelve (direct, send)."""
-    direct = np.zeros((N, 2))
-    send = np.zeros((N, 2))
+    por llamada (el mismo pájaro conserva posición, distancia y registro). Devuelve (direct, send).
+    fit=True (eventos): las llamadas se sintetizan en un buffer más largo (nunca se truncan en seco en N), el
+    grito de rapaz se acorta para terminar antes del siguiente / del final útil, y lo que pase de N se
+    desvanece en `fit_fade` s terminando exactamente en N (sólo el eco/reverb posterior excede N)."""
+    L = N + (int(1.7 * SR) if fit else 0)
+    direct = np.zeros((L, 2))
+    send = np.zeros((L, 2))
     who = {}
+    order = sorted(times)
     for i, t in enumerate(times):
         sp = species if species != "mixed" else rng.choice(["generic", "sparrow"])
         bid = birds[i] if birds is not None else i
@@ -803,8 +855,12 @@ def _bird_track(N, rng, times, *, species="generic", dist=(40.0, 150.0), lp_ref=
                             pn=(pans[i] if pans is not None else rng.uniform(-0.8, 0.8)), reg=rng.uniform(0.92, 1.08))
         if sp == "sparrow":
             call = _sparrow_call(rng, who[bid]["reg"])
+        elif sp == "raptor":
+            nxt = [u for u in order if u > t + 1e-6]
+            lim = min([N / SR - 0.03] + [u - 0.12 for u in nxt]) - t
+            call = _raptor_cry(rng, max_len=(lim if fit else None))
         else:
-            call = {"raptor": _raptor_cry}.get(sp, _songbird_phrase)(rng)
+            call = _songbird_phrase(rng)
         dm = who[bid]["dm"] * rng.uniform(0.95, 1.05)
         lpf = float(np.clip(lp_ref * (60.0 / dm) ** 0.4, 2200.0, 9000.0))
         y = dsp.lp(call, lpf, 2)
@@ -814,10 +870,21 @@ def _bird_track(N, rng, times, *, species="generic", dist=(40.0, 150.0), lp_ref=
         g = (40.0 / dm) * 10 ** (rng.uniform(-3, 0) / 20)
         dsp.mix_into(direct, st, int(t * SR), g)
         dsp.mix_into(send, st, int(t * SR), g * (0.35 + dm / 250.0))
+    if fit:
+        k = max(8, int(fit_fade * SR))
+        a = max(0, N - k)
+        if np.abs(direct[a:]).max() > 0 or np.abs(send[a:]).max() > 0:
+            ramp = np.cos(0.5 * np.pi * np.linspace(0.0, 1.0, N - a)) ** 2
+            if np.abs(direct[N:]).max() == 0 and np.abs(send[N:]).max() == 0:
+                ramp = np.ones(N - a)  # nada cruza N: no tocar lo que ya termina
+            direct[a:N] *= ramp[:, None]
+            send[a:N] *= ramp[:, None]
+        direct, send = direct[:N], send[:N]
     return direct, send
 
 
-def _valley_echo(x, rng, *, tail_db=-8.0, echoes=((0.31, -12.0), (0.54, -16.0), (0.86, -20.0), (1.21, -25.0))):
+def _valley_echo(x, rng, *, tail_db=-8.0, echoes=((0.31, -12.0), (0.54, -16.0), (0.86, -20.0), (1.21, -25.0)),
+                 lp_hz=3400.0, tail_lp=3000.0):
     """Eco de valle compatible con mono para eventos (pájaros, gritos): reflexiones discretas de las
     laderas con polaridad coherente, cada una más lejana = más oscura y con pan espejado, + cola difusa
     estrechada (la IR del preset tiene taps con signo aleatorio por canal -> anti-fase en eventos tonales)."""
@@ -828,11 +895,11 @@ def _valley_echo(x, rng, *, tail_db=-8.0, echoes=((0.31, -12.0), (0.54, -16.0), 
     m = dsp.mono(x)
     for i, (dt, gdb) in enumerate(echoes):
         d = int(dt * (1 + rng.uniform(-0.06, 0.06)) * SR)
-        e = dsp.lp(m, 3400.0 / (1 + 0.45 * i), 2)
+        e = dsp.lp(m, float(lp_hz) / (1 + 0.45 * i), 2)
         side = (-1) ** i * rng.uniform(0.3, 0.8)
         dsp.mix_into(out, dsp.pan(e, side), d, float(_db(gdb)))
     tail = dsp.convolve(x, dsp.ir_preset("valley_mountain"), wet=float(_db(tail_db)))
-    tail = dsp.width(dsp.lp(tail, 3000, 2), 0.6)
+    tail = dsp.width(dsp.lp(tail, float(tail_lp), 2), 0.6)
     out[:min(L, len(tail))] += tail[:L]
     return out
 
@@ -1444,7 +1511,10 @@ def empty_city_day(dur, rng, *, traffic=0.3, birds=2, wind=0.2, **_):
 @recipe("amb.birds_distant", family=FAM, sync="start", kind="event")
 def birds_distant(dur, rng, *, count=2, species="generic", space=None, distance=1.0, **_):
     """1-4 pájaros lejanos (FM 3-7 kHz, 50-150 ms, LPF ~4 kHz) con eco de valle/bosque.
-    species: generic|sparrow|raptor (rapaz = grito descendente, muy lejos). sync = inicio."""
+    species: generic|sparrow|raptor (rapaz = grito descendente áspero, muy lejos). sync = inicio.
+    count = número exacto de llamadas (rapaz: un grito por llamada). Las llamadas terminan dentro de `dur`
+    (el grito de rapaz se acorta a lo disponible; lo que cruce `dur` se desvanece en 80 ms); sólo el eco del
+    valle / la reverb exceden `dur` (hasta ~1.6-2.2 s)."""
     n = _n(dur)
     sp = species if species in ("generic", "sparrow", "raptor", "mixed") else "generic"
     ir = space or {"raptor": "valley_mountain", "sparrow": "city_day_street"}.get(sp, "valley_mountain")
@@ -1459,11 +1529,14 @@ def birds_distant(dur, rng, *, count=2, species="generic", space=None, distance=
         times = [first] + _natural_times(rng, k - 1, first + 0.35, max(first + 0.4, 0.85 * dur), 0.3)
         who = None
     bd, bs = _bird_track(n, rng, times, species=sp, dist=dist, lp_ref=(3200.0 if sp == "raptor" else 4000.0),
-                         birds=who)
+                         birds=who, fit=True)
     if ir == "none":
         wet = np.zeros((n, 2))
     elif ir == "valley_mountain":
-        wet = _valley_echo(bs, rng, tail_db=(-6.0 if sp == "raptor" else -10.0))
+        if sp == "raptor":  # rapaz a 250-600 m: ecos oscuros (absorción) y cola difusa baja (no "silbido")
+            wet = _valley_echo(bs, rng, tail_db=-12.0, lp_hz=2500.0, tail_lp=2500.0)
+        else:
+            wet = _valley_echo(bs, rng, tail_db=-10.0)
     else:
         wet = dsp.convolve(bs, dsp.ir_preset(ir), wet=float(_db(-7.0)))
         wet = _bass_width(wet, 1500.0, 0.7)

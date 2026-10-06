@@ -582,12 +582,15 @@ _GLASS_LOW = [85.0, 140.0, 210.0, 290.0, 410.0]
 _GLASS_HIGH = [560.0, 735.0, 940.0, 1220.0, 1580.0, 2050.0]
 
 
-def _glass_hit(rng, exc_ms=10.0, n_s=0.9, bright=0.0):
-    """Laminated windshield panel struck by a soft exciter."""
+def _glass_hit(rng, exc_ms=10.0, n_s=0.9, bright=0.0, damp=1.0):
+    """Laminated windshield panel struck by a soft exciter. damp < 1 shortens the low panel modes (a soft pad
+    still pressed on the glass absorbs them; the panel re-rings only when the pad leaves)."""
     m = _n(n_s)
     fl = [f * (1.0 + rng.uniform(-0.04, 0.04)) for f in _GLASS_LOW]
-    # laminated glass (PVB interlayer) is strongly damped: tau 60-150 ms on the low panel modes
-    tl = [tau * rng.uniform(0.85, 1.15) for tau in (0.10, 0.09, 0.075, 0.065, 0.055)]
+    # laminated glass (PVB interlayer) is strongly damped: tau 20-35 ms on the low panel modes (T60 < 0.25 s;
+    # a soft paw on a windshield thuds and dies, it does not ring)
+    dm = float(np.clip(damp, 0.2, 1.0))
+    tl = [tau * dm * rng.uniform(0.85, 1.15) for tau in (0.035, 0.032, 0.028, 0.024, 0.02)]
     al = [a + rng.uniform(-2.0, 2.0) for a in (-4.0, 0.0, -1.0, -3.0, -5.0)]
     fh = [f * (1.0 + rng.uniform(-0.05, 0.05)) for f in _GLASS_HIGH]
     th = [tau * rng.uniform(0.8, 1.2) for tau in (0.045, 0.038, 0.03, 0.025, 0.02, 0.015)]
@@ -612,10 +615,16 @@ def _glass_tick(rng):
 
 
 @recipe("cre.paw_on_glass", family=FAM, sync="transient", kind="event")
-def paw_on_glass(dur, rng, *, press_ms=220, squeak=0.4, sniff=True, inside=True, fur=1.0, body_db=0.0, **_):
+def paw_on_glass(dur, rng, *, press_ms=220, squeak=0.4, sniff=True, inside=True, fur=1.0, body_db=0.0,
+                 claws=None, claw_db=0.0, contact_damp=0.55, **_):
     """Paw pressed against the windshield, heard from inside the car (inside=True).
     sync = contact transient (onset of the pad exciter). body_db trims the low glass thump vs. the
-    contact detail (claw ticks, squeak, fur) - e.g. -4 under dense music + VO."""
+    contact detail (claw ticks, squeak, fur) - e.g. -4 under dense music + VO.
+    claws = number of claw-tip glass ticks (default random 1-3), claw_db = their level offset (bright 2-7 kHz
+    detail that survives VO carving; push it without raising the body). contact_damp scales the low panel
+    decay while the pad is pressed (0.55: thud of ~0.1 s); the release re-rings undamped.
+    Inside perspective: gentle 1-pole LP 10 kHz and -2 dB at 8 kHz (the glass radiates the contact detail
+    with little loss above 5 kHz, which is the only band VO carving leaves free)."""
     press = float(np.clip(press_ms, 60.0, 900.0)) / 1000.0
     pre = 0.05
     tot = pre + press + 0.9
@@ -625,11 +634,15 @@ def paw_on_glass(dur, rng, *, press_ms=220, squeak=0.4, sniff=True, inside=True,
     air = np.zeros(n)    # airborne exterior sounds (through glass if inside)
     c = pre
     # --- contact thump
-    hit = _glass_hit(rng, rng.uniform(8.0, 14.0), 1.0, 0.0 if inside else 4.0)
+    hit = _glass_hit(rng, rng.uniform(8.0, 14.0), 1.0, 0.0 if inside else 4.0, damp=contact_damp)
     _add(body, hit, c, _db(-2.0))
     # claw tips touching the glass just after the pad (1-3 tiny glassy ticks)
-    for j in range(int(rng.integers(1, 4))):
-        _add(det, _glass_tick(rng), c + rng.uniform(0.006, 0.035) + 0.012 * j, _db(rng.uniform(-17.0, -12.0)))
+    nc = int(rng.integers(1, 4))
+    if claws is not None:
+        nc = int(np.clip(claws, 0, 6))
+    for j in range(nc):
+        _add(det, _glass_tick(rng), c + rng.uniform(0.006, 0.035) + 0.012 * j,
+             _db(rng.uniform(-17.0, -12.0) + float(claw_db)))
     # pad slap itself (soft skin on glass)
     pm = _n(0.06)
     slap = _bp(rng.standard_normal(pm), 300.0, 1400.0, 2) * _env_ar(pm, 0.002, 0.012)
@@ -675,7 +688,8 @@ def paw_on_glass(dur, rng, *, press_ms=220, squeak=0.4, sniff=True, inside=True,
     body = _hp(body, 70.0, 4) * _db(float(body_db))
     det = _hp(det, 120.0, 4)
     if inside:
-        det = dsp.eq(det, "highshelf", 5000.0, 0.7, -4.0)  # glass panel radiation
+        # glass panel radiation: gentle top roll-off only (the old -4 dB shelf at 5 kHz hid the hero detail)
+        det = dsp.eq(dsp.one_pole_lp(det, 10000.0), "peak", 8000.0, 0.8, -2.0)
     air = _hp(air, 120.0, 4)
     p = rng.uniform(-0.12, 0.12)
     y = dsp.pan(body, p * 0.3) + dsp.pan(det, p) + dsp.pan(air, p * 0.6)
@@ -872,9 +886,16 @@ def _honk(rng, f_peak):
 
 
 @recipe("cre.geese_flyover", family=FAM, sync="start", kind="event")
-def geese_flyover(dur, rng, *, birds=6, honks=2, through_glass=0.5, direction=1, space="valley_mountain", **_):
+def geese_flyover(dur, rng, *, birds=6, honks=2, through_glass=0.5, direction=1, space="valley_mountain",
+                  distance_m=20.0, **_):
     """Flock of geese flying over (seen through a panoramic sunroof). Wingbeats per bird with own
-    rate/phase; 0-3 far reverberant honks; through_glass blends a glass-muffled version."""
+    rate/phase; 0-3 far reverberant honks; through_glass blends a glass-muffled version.
+    distance_m (default 20 = the original 12-35 m flock): each bird is drawn at distance_m*[0.6, 1.75].
+    Wings: 12/d gain, air-absorption LP clip(16000*12/d, 1500, 15000) Hz, and beyond 30 m an extra (30/d)^3
+    (the faint wing whuff sinks under the air/ambience floor); feather layers scale by clip(30/d).
+    Honks fall only 6 dB per doubling re 20 m with a mild extra LP, so beyond ~60 m the flock is honk-led
+    (a tiny flock 100+ m up: honks carry, wings are barely there)."""
+    dist = float(np.clip(distance_m, 3.0, 400.0))
     D = max(0.6, float(dur))
     nb = int(np.clip(birds, 1, 12))
     n = _n(D + 0.3)
@@ -884,8 +905,9 @@ def geese_flyover(dur, rng, *, birds=6, honks=2, through_glass=0.5, direction=1,
         rank = order[b] / max(1, nb - 1)
         tc = D * (0.32 + 0.36 * rank) + rng.uniform(-0.05, 0.05)   # V: leader first
         w = D * rng.uniform(0.16, 0.24)
-        d_m = rng.uniform(12.0, 35.0)
-        gb = 12.0 / d_m
+        d_m = dist * rng.uniform(0.6, 1.75)
+        gb = 12.0 / d_m * min(1.0, 30.0 / d_m) ** 3
+        gf = float(np.clip(30.0 / d_m, 0.0, 1.0))           # feather (2-6 kHz) layers fade with distance
         rate = rng.uniform(3.0, 4.0)
         ph0 = rng.uniform(0.0, 1.0)
         p0 = float(np.clip((rank - 0.5) * 1.5 + rng.uniform(-0.15, 0.15), -0.85, 0.85))
@@ -901,15 +923,16 @@ def geese_flyover(dur, rng, *, birds=6, honks=2, through_glass=0.5, direction=1,
             g = 1.0 / (1.0 + ((t - tc) / w) ** 2)   # inverse-square-like flyover arc
             if g < 0.04:
                 continue
-            _add(mono, _wingbeat(rng), max(t, 0.0), g * gb * _db(rng.uniform(-2.0, 1.0)))
+            _add(mono, _wingbeat(rng, -5.0 + 20.0 * np.log10(max(gf, 1e-3))), max(t, 0.0),
+                 g * gb * _db(rng.uniform(-2.0, 1.0)))
             if rng.random() < 0.7:  # upstroke feathers
                 fm = _n(0.08)
                 fe = _env_asym(fm, 0.4, 1.0, 1.3)
                 uf = rng.standard_normal(fm) * _shot_env(fm, rng, 10000.0, rng.uniform(150.0, 250.0), 0.5)
                 uf = _bp(uf, 2500.0, 6000.0, 2) * fe
-                _add(mono, _unit(uf), max(t, 0.0) + 0.5 / r, g * gb * _db(rng.uniform(-18.0, -13.0)))
+                _add(mono, _unit(uf), max(t, 0.0) + 0.5 / r, g * gb * gf * _db(rng.uniform(-18.0, -13.0)))
         # air absorption by distance
-        mono = _lp(mono, float(np.clip(16000.0 * 12.0 / d_m, 4000.0, 15000.0)), 2)
+        mono = _lp(mono, float(np.clip(16000.0 * 12.0 / d_m, 1500.0, 15000.0)), 2)
         pc = p0 + drift * (np.linspace(0, 1, n) - 0.5)
         wings += dsp.pan(mono, pc)
     wings = _hp(wings, 120.0, 4)
@@ -918,17 +941,20 @@ def geese_flyover(dur, rng, *, birds=6, honks=2, through_glass=0.5, direction=1,
     # --- honks: far, reverberant
     nh = int(np.clip(honks, 0, 3))
     hon = np.zeros((n, 2))
+    g_h = min(1.0, 20.0 / dist)                                # 6 dB per doubling re 20 m (inverse distance)
+    lp_h = float(np.clip(np.sqrt(60.0 / dist), 0.6, 1.0))      # extra air absorption on the honk top
     if nh:
         ts = np.sort(rng.uniform(0.12, 0.85, nh)) * D
         for t in ts:
             f = float(rng.choice(_HONK_NOTES))
             h = _honk(rng, f)
-            h = _lp(_hp(h, 200.0, 2), rng.uniform(3000.0, 4200.0), 2)
+            h = _lp(_hp(h, 200.0, 2), rng.uniform(3000.0, 4200.0) * lp_h, 2)
             pp = rng.uniform(-0.6, 0.6)
-            _add(hon, dsp.pan(_unit(h), pp), t, _db(rng.uniform(-16.0, -11.0)))
+            _add(hon, dsp.pan(_unit(h), pp), t, g_h * _db(rng.uniform(-16.0, -11.0)))
             if rng.random() < 0.35:  # answering honk from another bird, a bit lower
-                h2 = _lp(_hp(_honk(rng, f * rng.choice([0.89, 0.84])), 200.0, 2), 3500.0, 2)
-                _add(hon, dsp.pan(_unit(h2), -pp * 0.7), t + rng.uniform(0.2, 0.32), _db(rng.uniform(-20.0, -15.0)))
+                h2 = _lp(_hp(_honk(rng, f * rng.choice([0.89, 0.84])), 200.0, 2), 3500.0 * lp_h, 2)
+                _add(hon, dsp.pan(_unit(h2), -pp * 0.7), t + rng.uniform(0.2, 0.32),
+                     g_h * _db(rng.uniform(-20.0, -15.0)))
         hon = dsp.reverb(hon, space, -2.0, dry=0.6, hp_send=200.0) if space and space != "none" else hon
     L = max(len(wings), len(hon))
     y = dsp.pad_to(wings, L) + dsp.pad_to(hon, L)
@@ -940,7 +966,7 @@ def geese_flyover(dur, rng, *, birds=6, honks=2, through_glass=0.5, direction=1,
         g *= _rms(y) / _rms(g)
         y = (1.0 - a) * y + a * g * _db(-1.5)
     y = _hp(y, 120.0, 4)
-    return Render(_finish(y, 0.01, 0.06), sync_offset=0, meta={"birds": nb, "honks": nh})
+    return Render(_finish(y, 0.01, 0.06), sync_offset=0, meta={"birds": nb, "honks": nh, "distance_m": dist})
 
 
 # ====================================================================== small birds

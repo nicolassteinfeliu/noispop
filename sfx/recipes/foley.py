@@ -6,8 +6,9 @@ Todo se sintetiza por capas (transiente + cuerpo + textura + espacio), con model
     pulso coseno-cuadrado (su ancho fija el brillo: 0.05-0.15 ms = duro/metálico, 2-5 ms = yema de dedo) que
     excita un banco modal (senos amortiguados, fase física sin(wt) -> sin escalón) + una ráfaga de ruido de
     contacto. Cada evento se re-sintetiza desde el rng (frecuencias +-2-5 %, tau +-15-20 %, nivel +-1.5 dB).
-  * Agua: gotas = impacto (tick modal de chapa pintada 2-5 kHz tau 5-10 ms | vidrio 3-8 kHz más alto Q |
-    "splat" de ruido) + burbuja de Minnaert opcional (f0 = 3.26 / r) + satélites de salpicadura; las gotas
+  * Agua: gotas = impacto (tick modal de chapa pintada 2-5 kHz tau 1.5-5 ms, re-sorteado en cada gota |
+    vidrio 3-8 kHz tau 4-12 ms | "splat" de ruido LP 3-8 kHz), HP 400 Hz, + burbuja de Minnaert opcional
+    (f0 = 3.26 kHz*mm / r, r 0.8-2.5 mm, subida 10-20 %, tau 4-12 ms) + satélites de salpicadura; las gotas
     salen de 1-4 puntos de goteo cuasi-periódicos (cada punto con su timbre y su pan) + gotas Poisson + un
     hilo de escurrimiento (micro-burbujas densas, muy bajas).
   * Motores de portón: polyBLEP 90-140 Hz con arranque suave (rampa de pitch), variación de carga 1/f,
@@ -545,7 +546,8 @@ def light_contactor(dur, rng, *, hum=0.5, hum_hz=AB2, hum_s=1.5, arc=0.4, space=
                     send_db=-10.0, **_):
     """Contactor grande de luz de estudio: clack metálico (modos 300 Hz-3 kHz) con rebote de armadura + golpe
     de gabinete + chispa leve, y zumbido de lámpara (Ab2 ~ red 100 Hz, LPF 800 Hz) que decae en ~1.5 s.
-    Escenario de estudio. sync = clack."""
+    Escenario de estudio. sync = clack. arc 0..1: chispa + chisporroteo 2-8 kHz 5-60 ms después del clack,
+    nivel -24 + 18*arc dB re el clack (0.4 ~ -17 dB, discreto; 0.8 ~ -10 dB, crepitar eléctrico legible)."""
     pre = _n(0.006)
     hum_s = max(0.2, float(hum_s))
     n = pre + _n(max(float(dur), hum_s) + 0.05)
@@ -572,12 +574,27 @@ def light_contactor(dur, rng, *, hum=0.5, hum_hz=AB2, hum_s=1.5, arc=0.4, space=
     th = signal.oaconvolve(0.7 * _damped(nk, rng.uniform(130, 160), 0.025) +
                            0.5 * _damped(nk, rng.uniform(82, 92), 0.035), _pulse(0.003))[:nk]
     dsp.mix_into(y, th / (np.abs(th).max() + 1e-12), pre, _db(-6.0))
-    # chispa de contactos (detalle HF, finísimo)
+    # chispa de contactos + chisporroteo eléctrico. arc 0..1 escala en dB (-24 + 18*arc re el clack): un
+    # multiplicador lineal sobre -16 dB no cambiaba nada audible bajo el clack. La chispa inicial (HF, 1 ms
+    # después del contacto) queda pegada al clack; el chisporroteo (crackle 2-8 kHz, tren de Poisson de
+    # densidad decreciente) vive 5-60 ms después, fuera de la máscara temporal del clack, y es lo que lee.
+    arc = float(np.clip(arc, 0.0, 1.0))
     if arc > 0:
+        g_arc = _db(-24.0 + 18.0 * arc)
         na = _n(rng.uniform(0.008, 0.015))
         dens = rng.standard_normal(na) * (rng.random(na) < 0.12)
         sp = dsp.hp(dens, 3500, 2) * np.exp(-np.arange(na) / na * 3)
-        dsp.mix_into(y, sp / (np.abs(sp).max() + 1e-12), pre + _n(0.001), _db(-16.0) * float(arc))
+        dsp.mix_into(y, sp / (np.abs(sp).max() + 1e-12), pre + _n(0.001), g_arc * _db(-4.0))
+        t0z, t1z = 0.005, 0.02 + 0.04 * arc                       # sizzle: 5 ms .. 25-60 ms tras el clack
+        nz = _n(t1z - t0z + 0.01)
+        tz = np.arange(nz) / SR
+        rate = (1500.0 + 2500.0 * arc) * np.exp(-tz / (0.35 * (t1z - t0z)))   # chispas/s, decreciente
+        hit = rng.random(nz) < rate / SR
+        amp = np.where(hit, rng.lognormal(0.0, 0.7, nz) * rng.choice([-1.0, 1.0], nz), 0.0)
+        cr = dsp.bp(signal.oaconvolve(amp, np.exp(-np.arange(_n(0.0006)) / (0.00015 * SR)))[:nz], 2000.0, 8000.0, 2)
+        cr += 0.25 * np.std(cr) * dsp.bp(rng.standard_normal(nz), 2500.0, 7000.0, 2) * np.exp(-tz / 0.012)
+        cr *= _ss(tz, 0.0, 0.002) * (1.0 - _ss(tz, t1z - t0z - 0.004, t1z - t0z + 0.008))
+        dsp.mix_into(y, cr / (np.abs(cr).max() + 1e-12), pre + _n(t0z), g_arc)
     # zumbido de lámpara: enciende 15-30 ms después (inrush) y decae en hum_s
     if hum > 0:
         h0 = pre + _n(rng.uniform(0.015, 0.03))
@@ -596,35 +613,54 @@ def light_contactor(dur, rng, *, hum=0.5, hum_hz=AB2, hum_s=1.5, arc=0.4, space=
 # fol.droplets
 # =====================================================================================================
 
+_MINNAERT = 3260.0          # Hz*mm: f0 = 3.26 kHz * mm / r
+_PANEL_TAU_MAX = 0.040      # s: tope de decaimiento de un modo de chapa pintada con película de agua
+
+
 def _drop(rng, surface: str, timbre: dict, close: float = 1.0):
-    """Una gota: impacto (tick de chapa / vidrio / splat) + burbuja de Minnaert opcional + satélites."""
+    """Una gota: impacto (tick modal / splat) + burbuja de Minnaert opcional + satélites.
+
+    El juego modal se re-sortea en CADA gota (2-3 modos a +-20 % de los del punto de goteo, amplitudes al
+    azar: el modo más fuerte no es siempre el más grave) con decaimiento corto (chapa pintada mojada:
+    1.5-5 ms, vidrio 4-12 ms, tope 40 ms), así ninguna altura se repite gota tras gota ni queda sonando en la
+    reverb. El 'splat' es ruido corto LP 3-8 kHz; la burbuja es un chirp de Minnaert (r 0.8-2.5 mm, subida
+    10-20 %, tau 4-12 ms con Q físico). Todo el impacto lleva HP 400 Hz (24 dB/oct): sin columna grave."""
     n = _n(0.09)
     y = np.zeros(n)
     kind = timbre["kind"] if rng.random() < 0.75 else rng.choice(["tick", "plink", "splat"])
-    fs = timbre["f"] * (1 + rng.uniform(-0.035, 0.035, len(timbre["f"])))
-    # impacto (siempre hay contacto)
-    if kind == "tick" and surface == "glass":
+    k = 2 if rng.random() < 0.5 else 3
+    fs = np.asarray(timbre["f"][:k], np.float64) * (1.0 + rng.uniform(-0.2, 0.2, k))
+    amps = -rng.uniform(2.0, 11.0, k)
+    pw = np.array([0.5, 0.35, 0.15][:k])
+    amps[int(rng.choice(k, p=pw / pw.sum()))] = 0.0                        # el más fuerte: casi siempre grave
+    glass = surface == "glass"
+    if kind == "tick" and glass:
         exc = _pulse(rng.uniform(0.05e-3, 0.1e-3))
-        imp = _strike(exc, fs, rng.uniform(0.008, 0.02, len(fs)), [0, -4, -7, -10][: len(fs)], rng, aj=2.0, n=n)
-        sp = _strike(exc, rng.uniform(8500, 12500, 2), rng.uniform(0.004, 0.008, 2), [-8, -12], rng, n=n)
+        taus = np.minimum(rng.uniform(0.004, 0.012, k), _PANEL_TAU_MAX)
+        imp = _strike(exc, fs, taus, amps, n=n)
+        sp = _strike(exc, rng.uniform(8500, 12500, 2), rng.uniform(0.003, 0.006, 2), [-8, -12], rng, n=n)
     elif kind == "tick":
         exc = _pulse(rng.uniform(0.06e-3, 0.15e-3))
-        imp = _strike(exc, fs, rng.uniform(0.005, 0.010, len(fs)), [0, -3, -6, -9][: len(fs)], rng, aj=2.0, n=n)
-        sp = _strike(exc, rng.uniform(6000, 9500, 2), rng.uniform(0.002, 0.004, 2), [-9, -13], rng, n=n)
+        taus = np.minimum(rng.uniform(0.0015, 0.005, k), _PANEL_TAU_MAX)
+        imp = _strike(exc, fs, taus, amps, n=n)
+        sp = _strike(exc, rng.uniform(6000, 9500, 2), rng.uniform(0.0015, 0.003, 2), [-9, -13], rng, n=n)
     else:
         imp = _strike(_pulse(0.15e-3), fs[:2], [0.002, 0.0015], [0, -4], rng, aj=2.0, n=n) * 0.4
         sp = np.zeros(n)
     pk = np.abs(imp).max() + 1e-12
     imp = (imp + sp) / pk                                                    # chispa HF del panel
-    pat = _burst(n, rng, rng.uniform(0.5e-3, 1.8e-3), 1500, 12000)           # golpe de agua sobre la película
+    # golpe de agua sobre la película: ruido muy corto, LP 3-8 kHz
+    pat = dsp.lp(_burst(n, rng, rng.uniform(0.5e-3, 1.8e-3)), rng.uniform(3000.0, 8000.0), 2)
     pat /= np.abs(pat).max() + 1e-12
     g_imp = {"tick": 1.0, "plink": 0.45, "splat": 0.3}[kind]
-    y += g_imp * imp + (0.28 if kind != "splat" else 1.0) * pat
-    # burbuja (cavidad atrapada en la película/charco): f0 = 3.26 / r
+    y += g_imp * imp + (0.4 if kind != "splat" else 1.0) * pat
+    # burbuja (cavidad atrapada en la película/charco): Minnaert, radio propio de cada gota
     if kind == "plink" or rng.random() < 0.3:
-        f0 = timbre["fb"] * rng.uniform(0.9, 1.12)
-        nb = _n(0.06)
-        b = dsp.bubble(f0, rng.uniform(0.004, 0.011), nb, glide=rng.uniform(0.12, 0.45), rng=rng)
+        r_mm = float(np.clip(timbre["r_mm"] * rng.lognormal(0.0, 0.2), 0.8, 2.5))
+        f0 = _MINNAERT / r_mm
+        tau = float(np.clip(rng.uniform(25.0, 60.0) / (np.pi * f0), 0.004, 0.012))
+        nb = _n(min(0.08, 7.0 * tau + 0.004))
+        b = dsp.bubble(f0, tau, nb, glide=rng.uniform(0.10, 0.20), rng=rng)
         b /= np.abs(b).max() + 1e-12
         dsp.mix_into(y, b, _n(rng.uniform(0.0008, 0.004)), 1.0 if kind == "plink" else 0.5)
     # satélites de salpicadura (micro-gotitas)
@@ -634,27 +670,159 @@ def _drop(rng, surface: str, timbre: dict, close: float = 1.0):
             s = dsp.bubble(rng.uniform(4500, 9000), rng.uniform(0.001, 0.003), nb, glide=0.3, rng=rng)
             dsp.mix_into(y, s / (np.abs(s).max() + 1e-12), _n(rng.uniform(0.008, 0.045)),
                          _db(rng.uniform(-22, -14)))
+    y = dsp.hp(y, 400.0, 4)                                                  # sin columna 120-400 Hz
     # cerca = más brillo
     y = y if close > 0.8 else dsp.lp(y, 6000 + 12000 * close, 2)
     return y
 
 
 def _timbre(rng, surface: str):
-    """Timbre de un punto de goteo (lo que se repite en una misma gota que cae del mismo borde)."""
-    if surface == "glass":
-        f = np.sort(_spread_freqs(rng, 3000, 8000, 4, 0.1))
-        kinds = ["tick", "tick", "plink", "splat"]
+    """Rasgos de un punto de goteo (borde del capó / espejo / parrilla): centro modal y radio típico de gota.
+    Consume del rng exactamente lo mismo que la versión original (4 uniformes + 1 uniforme + 1 choice), así
+    los tiempos de las gotas de cada semilla no cambian. Cada gota re-sortea sus modos alrededor de éstos."""
+    u = (rng.uniform(-0.1, 0.1, 4) + 0.1) / 0.2                             # 4 x U(0, 1)
+    lo, hi = (3000.0, 8000.0) if surface == "glass" else (2000.0, 5000.0)
+    fc = lo * (hi / lo) ** u[0]
+    f = fc * np.array([1.0, 1.5 + 0.7 * u[1], 2.4 + 1.0 * u[2]])
+    f = np.minimum(f, 15000.0)
+    r_mm = 0.8 + 1.7 * (rng.uniform(1600, 4200) - 1600.0) / 2600.0           # radio de burbuja 0.8-2.5 mm
+    kinds = ["tick", "tick", "plink", "splat"]
+    return {"f": f, "r_mm": float(r_mm), "fb": _MINNAERT / r_mm, "kind": str(rng.choice(kinds))}
+
+
+def _ctrl_1f(n: int, rng, rates=(0.2, 0.45, 1.0), decay=0.6) -> np.ndarray:
+    """Modulador ~1/f lento a tasa de control (nudos con interpolación coseno por octava), en [-1, 1]."""
+    tc = np.arange(0.0, n / SR + 0.05, 0.005)
+    y = np.zeros_like(tc)
+    for o, r in enumerate(rates):
+        step = 1.0 / r
+        k = int(tc[-1] / step) + 3
+        v = rng.uniform(-1, 1, k)
+        u = tc / step + rng.uniform(0, 1)
+        i = np.floor(u).astype(np.int64)
+        w = 0.5 - 0.5 * np.cos(np.pi * (u - i))
+        y += decay ** o * (v[i] * (1 - w) + v[i + 1] * w)
+    y /= np.abs(y).max() + 1e-12
+    return np.interp(np.arange(n) / SR, tc, y)
+
+
+def _rain_panel_ir(rng, surface: str) -> np.ndarray | None:
+    """Respuesta de la superficie golpeada por la lluvia: chapa (300 Hz-3 kHz, tau 4-12 ms), vidrio (2-6 kHz,
+    tau 2-5 ms); asfalto = None (sólo ruido de impacto)."""
+    if surface == "metal":
+        k, lo, hi, tl, th = 26, 300.0, 3000.0, 0.004, 0.012
+    elif surface == "glass":
+        k, lo, hi, tl, th = 18, 2000.0, 6000.0, 0.002, 0.005
     else:
-        f = np.sort(_spread_freqs(rng, 2000, 5000, 4, 0.1))
-        kinds = ["tick", "plink", "plink", "splat"] if surface != "metal" else ["tick", "tick", "plink", "splat"]
-    return {"f": f, "fb": rng.uniform(1600, 4200), "kind": str(rng.choice(kinds))}
+        return None
+    f = _spread_freqs(rng, lo, hi, k, 0.1)
+    ir = _modal_ir(_n(th * 7), f, rng.uniform(tl, th, k), rng.uniform(-12.0, 0.0, k))
+    return ir / (np.sqrt((ir ** 2).sum()) + 1e-12)
+
+
+def _rain(dur, rng, *, rate, surface, spread, distance, puddles, wash_db, variation_db, space, send_db):
+    """Lluvia: impactos Poisson (rate 100-800/s) con intensidad 1/f lenta (0.2-1 Hz), tamaño de gota log-normal
+    -> nivel (-30..0 dB) y centro espectral (gotas chicas 4-10 kHz, grandes 1-3 kHz); cada impacto es una
+    ráfaga de ruido 0.5-3 ms filtrada a su banda (vectorizado: 6 clases de tamaño, tren de impulsos * ruido)
+    que además excita los modos de la superficie (chapa / vidrio; asfalto = sólo ruido), burbujas de Minnaert
+    en charcos/película con probabilidad `puddles`, y un lavado difuso estéreo 1-12 kHz a wash_db re los
+    impactos, con LP suave por distancia (distance 0 cerca .. 1 lejos)."""
+    n = _n(dur + 0.12)
+    ne = _n(dur)
+    dist = float(np.clip(distance, 0.0, 1.0))
+    # intensidad: modula la tasa y el nivel
+    mod = _ctrl_1f(n, rng)
+    inten = _db(float(variation_db) * mod)                                     # +-variation_db
+    r_t = rate * inten ** 1.6
+    r_max = float(r_t.max())
+    nt = rng.poisson(r_max * dur)
+    ts = np.sort(rng.uniform(0.0, dur - 0.004, nt))
+    keep = rng.random(nt) < r_t[(ts * SR).astype(np.int64)] / r_max
+    ts = ts[keep]
+    m = len(ts)
+    d_mm = np.clip(rng.lognormal(np.log(0.9), 0.5, m), 0.3, 4.0)
+    u = np.log(d_mm / 0.3) / np.log(4.0 / 0.3)                                # 0 (chica) .. 1 (grande)
+    lvl = _db(-30.0 + 30.0 * u + rng.uniform(-3.0, 1.5, m)) * inten[(ts * SR).astype(np.int64)]
+    pans = rng.uniform(-spread, spread, m)
+    gl, gr = dsp.pan_gains(pans)
+    idx = (ts * SR).astype(np.int64)
+    imp = np.zeros((n, 2))
+    edges = np.linspace(0.0, 1.0 + 1e-9, 7)
+    for b in range(6):
+        sel = (u >= edges[b]) & (u < edges[b + 1])
+        if not sel.any():
+            continue
+        ub = 0.5 * (edges[b] + edges[b + 1])
+        fc = float(np.exp(np.log(8000.0) + (np.log(1500.0) - np.log(8000.0)) * ub))
+        tau = (0.5e-3 + 2.5e-3 * ub) / 3.0                                     # ráfaga 0.5-3 ms
+        kn = np.exp(-np.arange(_n(tau * 6)) / (tau * SR))
+        ka = max(2, _n(0.0001))
+        kn[:ka] *= np.linspace(0.0, 1.0, ka)
+        tr = np.zeros((n, 2))
+        np.add.at(tr[:, 0], idx[sel], lvl[sel] * gl[sel])
+        np.add.at(tr[:, 1], idx[sel], lvl[sel] * gr[sel])
+        env = signal.oaconvolve(tr, kn[:, None], axes=0)[:n]
+        nz = rng.standard_normal(n)
+        x = env * nz[:, None]
+        x = dsp.bp(x, max(400.0, fc / 1.9), min(16000.0, fc * 1.9), 2)
+        imp += x * np.sqrt(fc / 3000.0)                                        # ráfagas brillantes = más energía
+    out = imp.copy()
+    ir = _rain_panel_ir(rng, surface)
+    if ir is not None:
+        ir2 = _rain_panel_ir(rng, surface)                                      # dos zonas del panel (L / R)
+        pan_ = np.stack([signal.oaconvolve(imp[:, 0], ir)[:n], signal.oaconvolve(imp[:, 1], ir2)[:n]], axis=1)
+        out = 0.55 * imp + pan_ * (np.sqrt(np.mean(imp ** 2)) / (np.sqrt(np.mean(pan_ ** 2)) + 1e-12))
+    else:
+        # asfalto: salpicadura de micro-gotitas (HF corta) sobre el ruido de impacto
+        out = imp + 0.35 * dsp.hp(imp, 5000.0, 2)
+    # burbujas de Minnaert (charcos / película de agua)
+    pb = float(np.clip(puddles, 0.0, 0.5))
+    if pb > 0 and m:
+        bsel = np.nonzero(rng.random(m) < pb)[0]
+        ref = np.abs(out).max() + 1e-12
+        for j in bsel:
+            r_mm = float(np.clip(rng.lognormal(np.log(1.1), 0.35), 0.5, 2.5))
+            f0 = _MINNAERT / r_mm
+            tb = float(np.clip(rng.uniform(25.0, 60.0) / (np.pi * f0), 0.003, 0.012))
+            bb = dsp.bubble(f0, tb, _n(min(0.06, 6.0 * tb + 0.003)), glide=rng.uniform(0.08, 0.2), rng=rng)
+            bb = bb / (np.abs(bb).max() + 1e-12) * lvl[j] * ref * _db(-8.0)
+            dsp.mix_into(out, dsp.pan(bb, float(pans[j])), int(idx[j]) + _n(rng.uniform(0.001, 0.004)))
+    # lavado difuso: la lluvia lejana de todo el campo, estéreo decorrelacionado 1-12 kHz
+    wash = dsp.decorrelated_stereo(lambda r: dsp.bp(dsp.pink(n, r), 1000.0, 12000.0, 2), rng, 0.3)
+    wash *= np.sqrt(inten)[:, None] * _db(1.0 * _ctrl_1f(n, rng, (1.5, 3.0, 6.0)))[:, None]
+    wash *= np.sqrt(np.mean(out ** 2)) / (np.sqrt(np.mean(wash ** 2)) + 1e-12) * _db(float(wash_db))
+    wash = dsp.lp(wash, 11000.0 - 5000.0 * dist, 2)
+    out = out + wash
+    if dist > 0.05:
+        out = dsp.lp(out, float(np.clip(18000.0 - 12000.0 * dist, 4000.0, 18000.0)), 2)
+    out = dsp.hp(out, 250.0, 2)
+    out[ne:] *= np.linspace(1.0, 0.0, n - ne)[:, None]
+    out = dsp.fade(out, 0.01, 0.01)
+    out = _space(out, space, send_db, hp_send=400.0)
+    return out, m
 
 
 @recipe("fol.droplets", family="foley", sync="start", kind="event")
 def droplets(dur, rng, *, rate=6.0, surface="metal", trickle=0.5, spread=0.7, space="city_day_street",
-             send_db=-24.0, first_s=None, **_):
+             send_db=-24.0, first_s=None, mode="drip", distance=0.3, puddles=None, wash_db=-12.0,
+             variation_db=4.0, **_):
     """Gotas cayendo/escurriendo sobre carrocería, muy cerca y detalladas. surface: metal | glass.
-    Puntos de goteo cuasi-periódicos (timbre y pan propios) + gotas Poisson + hilo de escurrimiento."""
+    Puntos de goteo cuasi-periódicos (timbre y pan propios) + gotas Poisson + hilo de escurrimiento.
+    mode='rain': LLUVIA (no goteo). rate = impactos/s (100-800; un rate < 50 se toma como 300), surface
+    metal | glass | asphalt, distance 0..1 (LP suave), puddles = prob. de burbuja por gota (default 0.18
+    asfalto, 0.1 chapa, 0.06 vidrio), wash_db = lavado difuso re impactos (-12), variation_db = profundidad de
+    la intensidad 1/f (4 dB). Ver _rain."""
+    if str(mode).lower() == "rain":
+        sf = str(surface).lower()
+        sf = "glass" if sf.startswith("gl") else ("asphalt" if sf.startswith(("as", "road", "st")) else "metal")
+        dur = max(0.3, float(dur))
+        rr = float(rate) if float(rate) >= 50.0 else 300.0
+        pb = {"asphalt": 0.18, "metal": 0.1, "glass": 0.06}[sf] if puddles is None else float(puddles)
+        out, m = _rain(dur, rng, rate=float(np.clip(rr, 50.0, 1500.0)), surface=sf,
+                       spread=float(np.clip(spread, 0.0, 1.0)), distance=distance, puddles=pb,
+                       wash_db=wash_db, variation_db=variation_db, space=space, send_db=send_db)
+        return Render(_finish(out, fin=0.01, fout=0.03), sync_offset=0,
+                      meta={"mode": "rain", "events": int(m), "surface": sf, "rate": rr})
     surface = "glass" if str(surface).lower().startswith("gl") else "metal"
     dur = max(0.2, float(dur))
     rate = max(0.1, float(rate))

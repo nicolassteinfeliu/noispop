@@ -275,6 +275,17 @@ def _nb_tone(f, rng, nb_db=-14.0, bw=4.0, jitter=0.0006):
     return np.sin(ph) + 10 ** (nb_db / 20) * (a * np.cos(ph) - b * np.sin(ph)) / np.sqrt(2)
 
 
+def _res_tone(f, rng, q=10.0):
+    """Ruido resonado en f (curva de Hz por sample): ruido de banda angosta de ancho ~f/q modulado en cuadratura
+    sobre la fase de f (equivale a ruido por un resonador de Q=q que sigue a f). Potencia = la de un seno."""
+    f = np.asarray(f, np.float64)
+    n = len(f)
+    ph = TWO_PI * np.cumsum(f) / SR + rng.uniform(0, TWO_PI)
+    bw = max(1.0, float(np.mean(f)) / (2.0 * max(1.0, float(q))))
+    a, b = _bl_noise(n, rng, bw), _bl_noise(n, rng, bw)
+    return (a * np.cos(ph) - b * np.sin(ph)) / np.sqrt(2)
+
+
 def _decor(x, rng, amount=0.8, ms=11.0):
     """Mono -> estéreo con reflexiones cortas decorrelacionadas (paneles/carrocería). corr ~ 1/(1+a^2)."""
     x = dsp.mono(x)
@@ -828,10 +839,12 @@ def onboard_roll(dur, rng, *, speed_kmh=50.0, surface="dry", perspective="onboar
 
 @recipe("veh.wheel_spin", family="vehicle", sync="start", kind="event")
 def wheel_spin(dur, rng, *, speed_kmh=40.0, disc_whir=0.5, darken_at=0.5, surface="dry", spokes=5,
-               space="underpass_concrete", send_db=-24.0, hp_hz=120.0, **_):
+               space="underpass_concrete", send_db=-24.0, hp_hz=120.0, darken_db=-10.0, darken_hz=500.0,
+               darken_ramp_s=0.15, **_):
     """Primer plano de rueda: rodado cercano + whir de disco de freno (BP 2-5 kHz con AM de rotación,
     runout irregular) + swish de aire de los rayos de la llanta (AM a spokes*f_rot y f_rot). En darken_at
-    (fracción de dur) el LPF barre 8 -> 1.5 kHz y el nivel cae 6 dB."""
+    (fracción de dur) el LPF barre 8 kHz -> darken_hz (500) en darken_ramp_s (0.15 s) y el nivel cae
+    darken_db (-10 dB; con el LPF suma ~-20 dB de banda ancha). (Antes: 1.5 kHz en 0.45 s y -6 dB.)"""
     dur = max(0.4, float(dur))
     n = dsp.n_of(dur)
     t = np.arange(n) / SR
@@ -862,13 +875,17 @@ def wheel_spin(dur, rng, *, speed_kmh=40.0, disc_whir=0.5, darken_at=0.5, surfac
     sw = sw * np.maximum(sp_am, 0)[:, None]
     sw *= 0.3 * rr / _rms(sw)
     y = roll + whir + sw
-    # oscurecimiento: LPF 16k -> 8k (antes de darken) -> 1.5k, -6 dB
+    # oscurecimiento (sigue a la imagen que va a negro): LPF 16k -> 8k (40 ms antes de darken) -> darken_hz en
+    # darken_ramp_s, con darken_db de caída ancha. El cuerpo del rodado < 1.5 kHz es el que lleva el nivel, así
+    # que la caída tiene que ser de banda ancha para que "apagarse" se note (~-20 dB total por defecto).
     td = float(np.clip(darken_at, 0, 1)) * dur
-    s1 = _ss(t, td - 0.12, td)
-    s2 = _ss(t, td, td + 0.45)
-    fc = np.exp(np.log(16000) + (np.log(8000) - np.log(16000)) * s1 + (np.log(1500) - np.log(8000)) * s2)
+    ramp = float(np.clip(darken_ramp_s, 0.03, 1.0))
+    s1 = _ss(t, td - 0.04, td)
+    s2 = _ss(t, td, td + ramp)
+    f_end = float(np.clip(darken_hz, 200.0, 8000.0))
+    fc = np.exp(np.log(16000) + (np.log(8000) - np.log(16000)) * s1 + (np.log(f_end) - np.log(8000)) * s2)
     fc *= 1 + 0.05 * _mod(t, rng, 0.5)
-    y = dsp.tv_filter(y, fc, "lowpass", 0.707, stages=2, block=16) * (10 ** (-6.0 * s2 / 20))[:, None]
+    y = dsp.tv_filter(y, fc, "lowpass", 0.707, stages=2, block=16) * (10 ** (float(darken_db) * s2 / 20))[:, None]
     y = dsp.hp(y, hp_hz, 4) if hp_hz else y
     y = _tail_fade(y, n - int(0.06 * SR), int(0.06 * SR))
     y = _space(y, space, send_db)
@@ -898,10 +915,19 @@ def ev_drive(dur, rng, *, speed_kmh=50.0, accel=0.0, whine=0.5, tune=True, avas=
 
 @recipe("veh.avas_idle", family="vehicle", sync="start", kind="bed")
 def avas_idle(dur, rng, *, level=0.5, note="Eb4", hum=0.5, breath_s=5.0, space="open_exterior", send_db=-16.0,
-              hp_hz=120.0, **_):
+              hp_hz=120.0, standby=0.1, speed_kmh=None, tonal=0.3, **_):
     """EV detenido/listo: AVAS muy suave (3 parciales armónicos de `note`: Eb4-Eb5-Bb5 por defecto, 0/-8/-14 dB)
     con respiración lenta irregular y batido sutil, + zumbido eléctrico (Bb3 y armónicos) + portadora del
-    inversor (Bb8) apenas audible. level 0..1 = presencia del AVAS frente al zumbido (la cama se normaliza a RMS)."""
+    inversor (Bb8) apenas audible + capa de reposo NO tonal (ventilador / bomba de refrigerante: siseo BP
+    800-3000 Hz con AM 1/f lenta, y una portadora de inversor 26 dB debajo).
+    level 0..1 = presencia del AVAS (peso 1.5*level: level=0 -> AVAS exactamente apagado).
+    hum 0..1 = zumbido eléctrico tonal (Bb3). standby 0..1 = siseo de reposo (standby 1 = zumbido de hum 0.5
+    +6 dB; el default 0.1 queda ~-30 dB bajo un AVAS de level 0.4). La cama se normaliza a RMS, así que lo que
+    cuenta es la proporción: EV detenido, listo y silencioso (hiperreal) = level 0, hum 0.05-0.15,
+    standby 0.4-0.8. speed_kmh (opcional): si se da, el AVAS es 0 a 0 km/h, sube a nivel pleno a 5 km/h, pleno
+    hasta 20 km/h y se apaga a 24 (como la norma); sin speed_kmh suena pleno (comportamiento anterior).
+    tonal 0..1 (default 0.3): <1 sintetiza AVAS y zumbido como ruido resonado (Q 8-15, deriva +-0.3 %) + silbido
+    ancho de inversor 0.3-3 kHz, con los senos limpios ~15 dB debajo (tonal 0.3); tonal 1 = pila de senos original."""
     dur = max(0.5, float(dur))
     n = dsp.n_of(dur)
     t = np.arange(n) / SR
@@ -913,23 +939,58 @@ def avas_idle(dur, rng, *, level=0.5, note="Eb4", hum=0.5, breath_s=5.0, space="
     breath_db = 2.0 * (0.5 - 0.5 * np.cos(bph)) - 2.0 + 0.7 * _mod(t, rng, 0.12)
     br = 10 ** (breath_db / 20)
     fj = f0 * (1 + 0.003 * _mod(t, rng, 0.08))
+    tn = float(np.clip(1.0 if tonal is None else tonal, 0.0, 1.0))
+    legacy = tn >= 0.999
+    # tonal < 1: cuerpo = ruido resonado (Q 8-15, deriva +-0.3 %) en las mismas frecuencias; los senos limpios
+    # quedan tn^1.5 / sqrt(1 - tn^2) debajo (tonal 0.3 -> ~-15 dB). tonal 1 = pila de parciales original.
+    g_sin = 1.0 if legacy else tn ** 1.5
+    g_res = 0.0 if legacy else float(np.sqrt(max(0.0, 1.0 - tn * tn)))
     av = np.zeros(n)
     for k, d in ((1, 0.0), (2, -8.0), (3, -14.0)):
         a = 10 ** ((d + 1.5 * _mod(t, rng, 0.1 + 0.05 * k)) / 20)
-        tone = _nb_tone(fj * k, rng, -20, 1.5)
-        beat = 0.35 * _nb_tone(fj * k + rng.uniform(0.25, 0.6) * k ** 0.5, rng, -20, 1.5)
-        av += a * (tone + beat)
+        if legacy:
+            tone = _nb_tone(fj * k, rng, -20, 1.5)
+            beat = 0.35 * _nb_tone(fj * k + rng.uniform(0.25, 0.6) * k ** 0.5, rng, -20, 1.5)
+            av += a * (tone + beat)
+        else:
+            fk = fj * k * (1 + 0.003 * _mod(t, rng, 0.35 + 0.1 * k))
+            av += a * (g_sin * _nb_tone(fk, rng, -20, 1.5) + g_res * _res_tone(fk, rng, rng.uniform(8.0, 15.0)))
     nz = dsp.bp(rng.standard_normal(n), 300, 1500, 2) * (0.6 + 0.4 * br)
     av = av * br + 0.04 * nz
+    if not legacy:
+        # silbido ancho del inversor/motor en reposo (0.3-3 kHz, AM 1/f lenta): el AVAS real es ruido coloreado
+        wh = dsp.bp(dsp.pink(n, rng), 300.0, 3000.0, 2)
+        wh = wh / (np.sqrt(np.mean(wh ** 2)) + 1e-12) * 10 ** (2.0 * _mod(t, rng, 0.2) / 20)
+        av = av + (1.0 - tn) * 0.32 * _rms(av) * wh * (0.7 + 0.3 * br)
     # zumbido eléctrico y portadora del inversor en reposo
     fh = _note_hz("Bb3") * (1 + 0.001 * _mod(t, rng, 0.1))
-    hm = sum(10 ** (d / 20) * _nb_tone(fh * k, rng, -16, 1.0) for k, d in ((1, 0.0), (2, -6.0), (3, -12.0)))
+    if legacy:
+        hm = sum(10 ** (d / 20) * _nb_tone(fh * k, rng, -16, 1.0) for k, d in ((1, 0.0), (2, -6.0), (3, -12.0)))
+    else:
+        hm = sum(10 ** (d / 20) * (g_sin * _nb_tone(fh * k, rng, -16, 1.0) + g_res * _res_tone(fh * k, rng, rng.uniform(10.0, 15.0)))
+                 for k, d in ((1, 0.0), (2, -6.0), (3, -12.0)))
     hm *= 10 ** (1.0 * _mod(t, rng, 0.3) / 20)
     inv = _nb_tone(_note_hz("Bb8") * (1 + 0.001 * _mod(t, rng, 1.0)), rng, -8, 6.0) * 10 ** (1.5 * _mod(t, rng, 2.0) / 20)
-    y = (0.25 + 1.5 * lv) * av + float(hum) * (0.22 * hm + 0.012 * inv)
+    # capa de reposo no tonal: ventilador / bomba de refrigerante + portadora del inversor 26 dB debajo
+    sb = float(max(0.0, standby or 0.0))
+    stb = 0.0
+    if sb > 0:
+        fan = dsp.bp(dsp.pink(n, rng), 800.0, 3000.0, 2)
+        fan = fan / (np.sqrt(np.mean(fan ** 2)) + 1e-12) * 10 ** (1.5 * _mod(t, rng, 0.15) / 20)
+        car = _nb_tone(_note_hz("Bb8") * (1 + 0.001 * _mod(t, rng, 0.7)), rng, -8, 6.0)
+        car = car / (np.sqrt(np.mean(car ** 2)) + 1e-12)
+        stb = 0.18 * sb * (fan + 0.05 * car)
+    w_av = 1.5 * lv
+    if speed_kmh is not None:
+        # AVAS real: mudo detenido, sube hasta nivel pleno a 5 km/h, pleno 5-20 km/h, se apaga por encima de 20
+        vk = float(speed_kmh)
+        w_av *= float(_ss(vk, 0.0, 5.0) * (1.0 - _ss(vk, 20.0, 24.0)))
+    avas_on = w_av > 1e-6
+    y = w_av * av + float(hum) * (0.22 * hm + 0.012 * inv) + stb
     y = _widen(_decor(y, rng, 0.12), rng, corr=0.52)
     y = _space(y, space, send_db)[:n]
-    return Render(_finish(y, hp_hz, fin=0.08, fout=0.12), 0, {"avas_f0_hz": round(f0, 2)})
+    return Render(_finish(y, hp_hz, fin=0.08, fout=0.12), 0,
+                  {"avas_f0_hz": round(f0, 2), "avas_on": bool(avas_on), "standby": sb})
 
 
 @recipe("veh.wet_glide", family="vehicle", sync="peak", kind="event")
