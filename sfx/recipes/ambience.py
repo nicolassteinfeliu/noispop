@@ -447,7 +447,8 @@ _TEX = {
 
 def _wind_layers(N, rng, *, strength=0.5, gustiness=0.5, whistle=0.3, texture="none", corr=0.6,
                  body=(400.0, 900.0), whistle_band=(400.0, 1600.0), n_whistles=None, tex_db=0.0,
-                 hp_hz=120.0, gust_lo=None, gust_hi=2.0, sand=0.5, body_coh=0.85, grain_db=0.0, gate_floor=0.0):
+                 hp_hz=120.0, gust_lo=None, gust_hi=2.0, sand=0.5, body_coh=0.85, grain_db=0.0, gate_floor=0.0,
+                 leaf_att=(0.4, 3.0), leaf_crackle=0.6):
     """Viento por capas: cuerpo (marrón/rosa LPF 400-900 Hz con corte guiado por la ráfaga), filo (2-4
     silbidos eólicos Q 8-25 cuya frecuencia ~ velocidad, regla de Strouhal), textura (HP 3-8 kHz gateada).
     Devuelve dict de capas [N, 2] y las ráfagas."""
@@ -536,7 +537,8 @@ def _wind_layers(N, rng, *, strength=0.5, gustiness=0.5, whistle=0.3, texture="n
         layers["grains"] = cr / _rms(cr) * body_rms * _db(-17 + 10 * np.log10(max(sand, 0.05) / 0.5) + grain_db)
     elif texture == "leaves":
         rate = 50.0 + 150.0 * np.clip((0.5 * (gn[:, 0] + gn[:, 1]) - 0.3) / 1.2, 0, 1)
-        gr = _grain_bank(N, rng, rate, [(2000, 3300), (3000, 4800), (4300, 6600), (5800, 8500)])
+        gr = _grain_bank(N, rng, rate, [(2000, 3300), (3000, 4800), (4300, 6600), (5800, 8500)], att_ms=leaf_att,
+                         crackle=leaf_crackle)
         layers["grains"] = gr / (_rms(gr) + 1e-12) * body_rms * _db(-15 + grain_db)
     elif texture == "snow":  # cristales de hielo sueltos, casi inaudibles
         rc = 12.0 * np.clip(0.5 * (gn[:, 0] + gn[:, 1]), 0, None) ** 2
@@ -655,7 +657,7 @@ def _bird_note(rng, pts, dur_s, *, harm=(1.0, 0.15, 0.04), trill_hz=0.0, trill_d
     if rough:
         env *= 1 + rough * _mod(n, rng, 20.0, 70.0, 1.0)
     if breath:
-        y += breath * dsp.hp(rng.standard_normal(n), 2000, 2)
+        y += breath * dsp.hp(rng.standard_normal(n), 2500, 4)
     return y * env
 
 
@@ -763,11 +765,31 @@ def _bird_track(N, rng, times, *, species="generic", dist=(40.0, 150.0), lp_ref=
         y = dsp.lp(call, lpf, 2)
         y = dsp.fade(y, 0.002, 0.01)
         pn = float(np.clip(who[bid]["pn"] + rng.uniform(-0.04, 0.04), -0.9, 0.9))
-        st = dsp.haas(dsp.pan(y, pn), pn * 0.6, 0.5)
+        st = dsp.pan(y, pn)  # sin ITD: en tonos de 3-7 kHz un retardo de 0.1-0.3 ms es anti-fase en mono
         g = (40.0 / dm) * 10 ** (rng.uniform(-3, 0) / 20)
         dsp.mix_into(direct, st, int(t * SR), g)
-        dsp.mix_into(send, st, int(t * SR), g * (0.6 + dm / 80.0))
+        dsp.mix_into(send, st, int(t * SR), g * (0.35 + dm / 250.0))
     return direct, send
+
+
+def _valley_echo(x, rng, *, tail_db=-8.0, echoes=((0.31, -12.0), (0.54, -16.0), (0.86, -20.0), (1.21, -25.0))):
+    """Eco de valle compatible con mono para eventos (pájaros, gritos): reflexiones discretas de las
+    laderas con polaridad coherente, cada una más lejana = más oscura y con pan espejado, + cola difusa
+    estrechada (la IR del preset tiene taps con signo aleatorio por canal -> anti-fase en eventos tonales)."""
+    x = dsp.stereo(x)
+    n = len(x)
+    L = n + int(1.6 * SR)
+    out = np.zeros((L, 2))
+    m = dsp.mono(x)
+    for i, (dt, gdb) in enumerate(echoes):
+        d = int(dt * (1 + rng.uniform(-0.06, 0.06)) * SR)
+        e = dsp.lp(m, 3400.0 / (1 + 0.45 * i), 2)
+        side = (-1) ** i * rng.uniform(0.3, 0.8)
+        dsp.mix_into(out, dsp.pan(e, side), d, float(_db(gdb)))
+    tail = dsp.convolve(x, dsp.ir_preset("valley_mountain"), wet=float(_db(tail_db)))
+    tail = dsp.width(dsp.lp(tail, 3000, 2), 0.6)
+    out[:min(L, len(tail))] += tail[:L]
+    return out
 
 
 def _natural_times(rng, count, t0, t1, min_gap=0.3):
@@ -1334,19 +1356,19 @@ def empty_city_day(dur, rng, *, traffic=0.3, birds=2, wind=0.2, **_):
     wash = _traffic_wash(N, rng, lp_hz=500.0, density=0.35, fog=False)
     wash /= _rms(wash)
     Lw = _wind_layers(N, rng, strength=0.2 + 0.4 * wind, gustiness=0.4, whistle=0.0, texture="leaves", corr=0.5,
-                      body=(300.0, 650.0), grain_db=-6.0, gate_floor=0.35)
+                      body=(300.0, 650.0), grain_db=-6.0, gate_floor=0.35, leaf_att=(1.5, 5.0), leaf_crackle=0.0)
     br = Lw["body"] * _db(-6) + Lw["texture"] + Lw["grains"]
     br /= _rms(br)
 
     def g_air(t, f):
         F = f[:, None]
-        return _hpm(F, 2500, 2) * _lpm(F, 9000, 2) * np.ones((1, len(t)))
+        return _hpm(F, 2500, 2) * _lpm(F, 13000, 2) * np.ones((1, len(t)))
 
-    air = _paint(N, rng, g_air, coh=0.2, slope=-3.0)
+    air = _paint(N, rng, g_air, coh=0.2, slope=-2.0)
     air *= np.stack([_gmod(N, rng, 0.05, 0.4, 1.5) for _ in range(2)], 1)
     air /= _rms(air)
-    y = (wash * _db(20 * np.log10(max(traffic, 0.02) / 0.3)) + br * _db(-5 + 20 * np.log10(max(wind, 0.02) / 0.2))
-         + air * _db(-24))
+    y = (wash * _db(20 * np.log10(max(traffic, 0.02) / 0.3)) + br * _db(-4 + 20 * np.log10(max(wind, 0.02) / 0.2))
+         + air * _db(-21))
     send = 0.6 * y
     # pasada EV muy lejana, apenas un swell
     if n / SR > 1.2 and traffic > 0.1:
@@ -1393,7 +1415,13 @@ def birds_distant(dur, rng, *, count=2, species="generic", space=None, distance=
         who = None
     bd, bs = _bird_track(n, rng, times, species=sp, dist=dist, lp_ref=(3200.0 if sp == "raptor" else 4000.0),
                          birds=who)
-    wet = dsp.convolve(bs, dsp.ir_preset(ir), wet=float(_db(-5.0 if sp == "raptor" else -7.0)))
+    if ir == "none":
+        wet = np.zeros((n, 2))
+    elif ir == "valley_mountain":
+        wet = _valley_echo(bs, rng, tail_db=(-6.0 if sp == "raptor" else -10.0))
+    else:
+        wet = dsp.convolve(bs, dsp.ir_preset(ir), wet=float(_db(-7.0)))
+        wet = _bass_width(wet, 1500.0, 0.7)
     y = np.zeros((len(wet), 2))
     y[:n] += bd
     y += wet

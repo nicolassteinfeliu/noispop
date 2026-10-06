@@ -276,11 +276,23 @@ def _decor(x, rng, amount=0.8, ms=11.0):
     return np.stack(chans, axis=1)
 
 
+def _widen(x, rng, corr=0.5, drift=0.1):
+    """Ensanche compatible con mono: S = w * Hilbert(M) (90 grados a toda frecuencia) => correlación L/R
+    = (1 - w^2) / (1 + w^2) independiente del contenido (ideal para camas tonales), L + R = 2 M.
+    w deriva lentamente (+-drift) para que la imagen respire."""
+    x = dsp.stereo(x)
+    m = 0.5 * (x[:, 0] + x[:, 1])
+    s0 = 0.5 * (x[:, 0] - x[:, 1])
+    c = float(np.clip(corr, 0.0, 0.98))
+    w = np.sqrt((1 - c) / (1 + c)) * (1 + drift * _mod(np.arange(len(m)) / SR, rng, 0.07))
+    sh = np.imag(signal.hilbert(m)) * w
+    return np.stack([m + sh + s0, m - sh - s0], axis=1)
+
+
 def _finish(y, hp_hz=120.0, fin=0.01, fout=0.05) -> np.ndarray:
     y = dsp.stereo(np.nan_to_num(np.asarray(y, np.float64)))
     if hp_hz and hp_hz > 0:
         y = dsp.hp(y, float(hp_hz), 4)       # 24 dB/oct
-    y = y - y.mean(axis=0, keepdims=True) * 0.0
     y = dsp.fade(y, max(0.003, fin), max(0.003, fout))
     return np.nan_to_num(y).astype(np.float32)
 
@@ -455,9 +467,6 @@ def _tire_roll(v, rng, surface="dry", persp="close", wet=None, corr=None, partic
     if persp == "interior":
         y = dsp.through_glass(y)
     return y
-
-
-_ZA = {"c": np.zeros((1, 1))}
 
 
 def _aero_power(F, vt, mc, persp):
@@ -668,7 +677,7 @@ def passby(dur, rng, *, speed_kmh=50.0, closest_m=4.0, direction=1, surface="wet
     sync = paso más cercano (llegada del sonido). Extras: peak_pos (fracción de dur), aero, wetness,
     body (pulso de presión 80-250 Hz si closest < 6 m), space/send_db (IR), hp_hz."""
     out, sync, src, info = _straight_passby(dur, rng, speed_kmh=speed_kmh, closest_m=closest_m,
-                                            direction=direction, surface=surface, ev=float(ev) / 0.4,
+                                            direction=direction, surface=surface, ev=float(ev) / 0.25,
                                             height_m=height_m, peak_pos=peak_pos, aero=aero, wetness=wetness)
     n = info["n"]
     out = dsp.hp(out, hp_hz, 4) if hp_hz else out
@@ -714,7 +723,7 @@ def approach(dur, rng, *, speed_kmh=40.0, start_m=60.0, end_m=5.0, surface="dry"
     xl = float(lateral_m) * (1 + 0.15 * _mod(t, rng, 0.25))
     load = 0.3 if acc < -0.5 else 0.6
     surface = _surface(surface)
-    src = _source(v, rng, surface, "close", ev=float(ev) / 0.4, aero=1.0, wet=wetness, load=load,
+    src = _source(v, rng, surface, "close", ev=float(ev) / 0.25, aero=1.0, wet=wetness, load=load,
                   f_scale=_key_scale(v1))
     st, rd = _propagate(src, xl, yv, z=height_m, mic_h=1.1, ground=_GROUND[surface])
     st = st[P:]
@@ -747,7 +756,7 @@ def onboard_roll(dur, rng, *, speed_kmh=50.0, surface="dry", perspective="onboar
     roll = _tire_roll(v, rng, surface, persp, wet=wetness, corr=0.45, am_db=1.0)
     aw = {"onboard": 1.3, "interior": 0.5, "far": 0.6, "close": 1.0}[persp] * float(aero)
     y = roll + (aw * _aero(v, rng, persp, corr=0.25) if aw > 0 else 0.0)
-    ew = {"onboard": 1.0, "interior": 2.2, "far": 0.5, "close": 1.0}[persp] * float(ev) / 0.4
+    ew = {"onboard": 1.0, "interior": 2.2, "far": 0.5, "close": 1.0}[persp] * float(ev) / 0.25
     if ew > 0:
         e = _ev(v, rng, amount=ew, load=0.5, mech=1.0, f_scale=_key_scale(v0, bool(tune)))
         if persp == "interior":
@@ -846,7 +855,7 @@ def ev_drive(dur, rng, *, speed_kmh=50.0, accel=0.0, whine=0.5, tune=True, avas=
     load = 0.5 + 0.35 * float(np.clip(float(accel) / 8.0, -1, 1.5)) + 0.08 * _mod(t, rng, 0.4)
     fs = _key_scale(max(1.0, float(speed_kmh) / 3.6), bool(tune))
     e = _ev(v, rng, amount=float(whine) / 0.5, load=load, avas=avas, inverter=inverter, mech=mech, f_scale=fs)
-    y = _decor(e, rng, float(width))
+    y = _widen(_decor(e, rng, 0.12), rng, corr=float(np.clip(1.0 - 0.52 * float(width), 0.25, 0.95)))
     return Render(_finish(y, hp_hz, fin=0.05, fout=0.08), 0,
                   {"f8_start_hz": round(8 * 150.0 * float(speed_kmh) / 3.6 / 45.0 * fs, 1), "key_scale": round(fs, 4)})
 
@@ -882,7 +891,7 @@ def avas_idle(dur, rng, *, level=0.5, note="Eb4", hum=0.5, breath_s=5.0, space="
     hm *= 10 ** (1.0 * _mod(t, rng, 0.3) / 20)
     inv = _nb_tone(_note_hz("Bb8") * (1 + 0.001 * _mod(t, rng, 1.0)), rng, -8, 6.0) * 10 ** (1.5 * _mod(t, rng, 2.0) / 20)
     y = (0.25 + 1.5 * lv) * av + float(hum) * (0.22 * hm + 0.012 * inv)
-    y = _decor(y, rng, 0.85)
+    y = _widen(_decor(y, rng, 0.12), rng, corr=0.52)
     y = _space(y, space, send_db)[:n]
     return Render(_finish(y, hp_hz, fin=0.08, fout=0.12), 0, {"avas_f0_hz": round(f0, 2)})
 
@@ -904,7 +913,7 @@ def wet_glide(dur, rng, *, speed_kmh=20.0, sizzle=0.6, closest_m=2.0, direction=
         return g
 
     out, sync, src, info = _straight_passby(dur, rng, speed_kmh=speed_kmh, closest_m=closest_m, direction=direction,
-                                            surface="wet", ev=float(ev) / 0.4, height_m=0.4, peak_pos=peak_pos,
+                                            surface="wet", ev=float(ev) / 0.25, height_m=0.4, peak_pos=peak_pos,
                                             aero=0.5, wetness=0.5 + 1.0 * sz, ground=0.68)
     n = info["n"]
     # gotitas: en una pasada aparte (también con Doppler/pan) para controlar su nivel
@@ -948,7 +957,7 @@ def gravel_curve(dur, rng, *, speed_kmh=25.0, wet=True, radius_m=14.0, closest_m
     y = d + R * (1 - np.cos(phi))
     wet_f = 0.3 if wet else 0.0
     boost = 1 + 1.2 * float(slip) * slip_env
-    src = _source(v, rng, "gravel", "close", ev=float(ev) / 0.4, aero=0.6, wet=wet_f, boost=boost,
+    src = _source(v, rng, "gravel", "close", ev=float(ev) / 0.25, aero=0.6, wet=wet_f, boost=boost,
                   f_scale=_key_scale(v_ms))
     rs = _rms(src)
     # scrub lateral del neumático
@@ -1144,7 +1153,7 @@ def tunnel_passby(dur, rng, *, speed_kmh=60.0, wet=True, closest_m=3.0, directio
     acumulación de graves 120-250 Hz propia del túnel. sync = paso más cercano."""
     surface = "wet" if wet else "dry"
     out, sync, src, info = _straight_passby(dur, rng, speed_kmh=speed_kmh, closest_m=closest_m,
-                                            direction=direction, surface=surface, ev=float(ev) / 0.4,
+                                            direction=direction, surface=surface, ev=float(ev) / 0.25,
                                             height_m=0.5, peak_pos=peak_pos, aero=1.0,
                                             wetness=1.0 if wet else 0.0, ground=0.6 if wet else 0.45)
     n = info["n"]
@@ -1158,7 +1167,7 @@ def tunnel_passby(dur, rng, *, speed_kmh=60.0, wet=True, closest_m=3.0, directio
     # re-sintetizamos la fuente (no copia) con pre-roll para las imágenes, más oscura (paredes absorben HF)
     t = (np.arange(n + P) - P) / SR
     vv = v_ms * (1 + 0.008 * _mod(t, rng, 0.3))
-    src_i = _source(vv, rng, surface, "close", ev=float(ev) / 0.4, aero=1.0, wet=1.0 if wet else 0.0,
+    src_i = _source(vv, rng, surface, "close", ev=float(ev) / 0.25, aero=1.0, wet=1.0 if wet else 0.0,
                     particles=0.7, f_scale=_key_scale(v_ms))
     src_i = dsp.lp(src_i, 5000, 2)
     imgs = [(d + 2 * wall_cam, 0.55, 0.6),
