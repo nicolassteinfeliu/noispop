@@ -1,0 +1,62 @@
+# Lista de planos del spot Geely (EX2 / EX5) — 24 fps, 1194 frames (49.75 s).
+# Frames = verdad; segundos derivados. Cortes detectados con ffmpeg (scene > 0.25).
+# Índice de corte (cut[i]) = posición en `cuts` (0-based), usable en los cue sheets como "cut[7]+2".
+cuts: [29, 66, 76, 95, 124, 159, 179, 195, 226, 253, 295, 336, 350, 377, 391, 439, 463, 539, 567, 605,
+       611, 632, 659, 674, 698, 727, 758, 810, 848, 858, 872, 885, 908, 925, 958, 970, 1022, 1054, 1057,
+       1124, 1166, 1193]
+
+# Regiones SIN locución (s) detectadas por VAD (silero sobre el canal central). Ahí los SFX se escuchan.
+vo_gaps_s: [[0.0, 1.15], [2.59, 3.39], [5.25, 6.59], [10.27, 10.94], [12.26, 12.64], [13.18, 14.59],
+            [15.94, 16.35], [17.28, 17.66], [18.91, 19.23], [22.34, 22.78], [25.47, 26.43], [30.08, 30.88],
+            [34.72, 35.23], [42.85, 43.49], [43.78, 44.29], [45.98, 49.75]]
+
+music:
+  bpm: 118.0
+  first_kick_s: 0.077
+  period_s: 0.50847
+  end_s: 46.62          # después: silencio digital (remate sin audio original)
+  key: "Db mayor / Bb menor (colección de 5 bemoles). Notas seguras para elementos tonales: Bb Db Eb F Ab"
+
+shots:
+  - {f: [0, 29],     desc: "Paso bajo de hormigón con niebla al amanecer; silueta de hombre lejos; EX2 verde salvia en primer plano con faros encendidos"}
+  - {f: [29, 66],    desc: "Primer plano de rueda girando, destellos naranjos sobre la llanta; hacia 2.0 s va a oscuro"}
+  - {f: [66, 76],    desc: "Contrapicado veloz entre torres (movimiento de cámara)"}
+  - {f: [76, 95],    desc: "Bajo un paso elevado; auto lejos; ~3.5 s auto avanzando hacia cámara por avenida vacía"}
+  - {f: [95, 124],   desc: "Faro en primer plano 'despertando' entre la niebla"}
+  - {f: [124, 159],  desc: "POV interior por el parabrisas: intersección con niebla, semáforo rojo, panda cruzando frente a los faros de otro auto"}
+  - {f: [159, 179],  desc: "Panda caminando por la calle frente a los faros, niebla"}
+  - {f: [179, 195],  desc: "Primer plano: panda apoya la pata contra el parabrisas y mira hacia dentro (POV interior)"}
+  - {f: [195, 226],  desc: "Filas de pandas a ambos lados de una calle con niebla (dolly)"}
+  - {f: [226, 253],  desc: "Frente del EX2 avanzando entre las filas de pandas, faros encendidos"}
+  - {f: [253, 295],  desc: "Perfil de panda en primer plano; detrás un auto con luces traseras rojas"}
+  - {f: [295, 336],  desc: "EX2 deslizándose de lado en la niebla (12.5), paso de rueda cercano (13.0), reveal de focos traseros 'GEELY EX2' (13.5)"}
+  - {f: [336, 350],  desc: "Poste de luz y semáforo peatonal en rojo; el auto pasa"}
+  - {f: [350, 377],  desc: "Aéreo: camino en acantilado costero, olas rompiendo, auto diminuto"}
+  - {f: [377, 391],  desc: "Auto en curva de grava mojada, contraluz de atardecer"}
+  - {f: [391, 439],  desc: "Auto pasa por un arco de roca (16.5); camino oscuro en acantilado, haces de faros hacia cámara con destello (17.5-18.0)"}
+  - {f: [439, 463],  desc: "Valle con rayos de sol; auto diminuto"}
+  - {f: [463, 539],  desc: "Interior: hombre manejando, relajado, sonríe; paisaje rocoso por la ventana"}
+  - {f: [539, 567],  desc: "Frente del EX2 en la oscuridad, faros, niebla"}
+  - {f: [567, 605],  desc: "Geely EX5 EM-i de frente; haz de luz cenital, niebla (reveal de estudio)"}
+  - {f: [605, 611],  desc: "Ruta oscura, faros acercándose"}
+  - {f: [611, 632],  desc: "Aéreo de desierto; la cámara pasa un objeto en primer plano; auto en camino sinuoso al atardecer"}
+  - {f: [632, 659],  desc: "Interior: tira LED azul encendiéndose a lo largo del tablero"}
+  - {f: [659, 674],  desc: "Primer plano de parlante 'Flyme Sound' en la puerta"}
+  - {f: [674, 698],  desc: "Aéreo de bosque con camino y destello de sol"}
+  - {f: [698, 727],  desc: "EX5 avanzando hacia cámara, volcán nevado detrás"}
+  - {f: [727, 758],  desc: "EX5 en camino junto a lago (30.5); interior: mano en la consola/selector (31.0)"}
+  - {f: [758, 810],  desc: "Contrapicado en bosque, auto pasa (31.5); EX5 de frente por el bosque (32-33)"}
+  - {f: [810, 848],  desc: "EX2 en ciudad: travelling lateral con barrido (34.0), visto desde otro auto (34.5), capó cercano (35.0)"}
+  - {f: [848, 858],  desc: "EX2 de atrás, destello de atardecer junto a acantilado"}
+  - {f: [858, 872],  desc: "EX2 en nieve, la rueda levanta nieve (spray)"}
+  - {f: [872, 885],  desc: "EX2 de lado con montañas nevadas, movimiento"}
+  - {f: [885, 908],  desc: "Vista por techo panorámico: bandada de gansos volando"}
+  - {f: [908, 925],  desc: "Aéreo de bosque/lago con camino"}
+  - {f: [925, 958],  desc: "Interior: hombre manejando EX5, gran pantalla central con mapa"}
+  - {f: [958, 970],  desc: "Hombre afuera, de perfil, frente a las Torres del Paine"}
+  - {f: [970, 1022], desc: "Hombre fotografía montañas/lago con el celular; a la derecha el portón eléctrico del EX5 bajando y cerrando (41-42)"}
+  - {f: [1022, 1054], desc: "Túnel oscuro: EX5 hacia la salida luminosa, piso mojado, spray de agua (43.0)"}
+  - {f: [1054, 1124], desc: "Placa azul con logo GEELY y 'Descubre más en geely.cl' (la música termina ~46.6)"}
+  - {f: [1124, 1166], desc: "REMATE (sin audio original): panda cruza una calle vacía de ciudad, de día"}
+  - {f: [1166, 1193], desc: "REMATE: frente del EX2 mojado con gotas, faros encendidos, 'GEELY EX2'"}
+  - {f: [1193, 1194], desc: "Negro"}

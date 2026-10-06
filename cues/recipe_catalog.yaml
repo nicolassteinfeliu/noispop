@@ -1,0 +1,144 @@
+# Catálogo de recetas (CONTRATO). Nombres y parámetros principales congelados.
+# Los autores de recetas pueden AGREGAR parámetros opcionales con default; no renombrar ni quitar.
+# Todos aceptan dur (s) y rng. kind: event (normalizado a pico -6 dBFS) | bed (normalizado a RMS -20 dBFS).
+# sync: qué sample de la receta cae exactamente en el tiempo `at` del cue:
+#   start = inicio | transient = ataque principal | peak = máximo de energía (paso más cercano) | end = final.
+# Notas tonales seguras (tonalidad del tema: Db mayor / Bb menor): Bb Db Eb F Ab.
+
+# ============================================================ AMBIENCE  -> sfx/recipes/ambience.py
+amb.room_tone:      {kind: bed, sync: start, params: {space: underpass, air_db: -18, rumble_db: -6},
+                     desc: "Tono de sala/espacio. space: underpass|city_fog|city_day|cabin|studio|tunnel. Pink filtrado con AM lenta, capa de aire"}
+amb.city_distant:   {kind: bed, sync: start, params: {density: 0.5, lp_hz: 600, passbys: 1, fog: true},
+                     desc: "Ciudad lejana: wash de tráfico pasabajos, 0-3 pasos lejanos muy filtrados con reverb"}
+amb.fog_air:        {kind: bed, sync: start, params: {brightness: 0.5, motion: 0.3},
+                     desc: "Aire de niebla: siseo 4-14 kHz con picos espectrales que derivan lentamente, muy ancho"}
+amb.drips:          {kind: bed, sync: start, params: {rate: 1.0, space: underpass_concrete, pitch: 1.0},
+                     desc: "Goteo esporádico (burbujas Minnaert) en un espacio"}
+amb.surf:           {kind: bed, sync: start, params: {intensity: 0.7, crest_at: 0.5, distance: far},
+                     desc: "Mar/olas: rompiente con cresta en crest_at (fracción de dur), espuma, distancia far|mid|near"}
+amb.wind:           {kind: bed, sync: start, params: {strength: 0.5, gustiness: 0.5, whistle: 0.3, texture: none},
+                     desc: "Viento genérico: cuerpo + silbidos eólicos + textura (none|grass|sand|snow|leaves)"}
+amb.mountain_wind:  {kind: bed, sync: start, params: {strength: 0.6, river: 0.3, echo: true},
+                     desc: "Viento patagónico abierto (Torres del Paine) + río lejano opcional, ecos de valle"}
+amb.forest:         {kind: bed, sync: start, params: {rustle: 0.5, birds: 1, wind: 0.3},
+                     desc: "Bosque: hojas (granos HP con ráfagas) + 0-3 pájaros lejanos"}
+amb.lake:           {kind: bed, sync: start, params: {lap: 0.5, wind: 0.2},
+                     desc: "Orilla de lago: chapoteo suave de agua + brisa"}
+amb.desert_wind:    {kind: bed, sync: start, params: {strength: 0.5, sand: 0.5},
+                     desc: "Viento seco de desierto con arena"}
+amb.alpine:         {kind: bed, sync: start, params: {strength: 0.5},
+                     desc: "Montaña nevada: viento frío, silencio de nieve"}
+amb.cabin:          {kind: bed, sync: start, params: {speed_kmh: 60, road: 0.5, hvac: 0.3, pillar_wind: 0.3},
+                     desc: "Cabina de EV en marcha: rumble de ruta 120-500 Hz, HVAC, viento de pilar A (muy silenciosa)"}
+amb.cabin_still:    {kind: bed, sync: start, params: {hvac: 0.3, exterior: city_fog},
+                     desc: "Cabina detenida: HVAC + exterior escuchado a través del vidrio"}
+amb.tunnel:         {kind: bed, sync: start, params: {fans: 0.5, drip: 0.2},
+                     desc: "Túnel: dron de ventiladores 120-400 Hz, tono de aspas, goteo, reverb larga"}
+amb.studio:         {kind: bed, sync: start, params: {hum: 0.3},
+                     desc: "Estudio/escenario grande vacío: aire, zumbido muy bajo de luces"}
+amb.empty_city_day: {kind: bed, sync: start, params: {traffic: 0.3, birds: 2, wind: 0.2},
+                     desc: "Calle vacía de día (remate): tráfico muy lejano, gorriones, brisa"}
+amb.birds_distant:  {kind: event, sync: start, params: {count: 2, species: generic},
+                     desc: "1-4 pájaros lejanos (FM 3-7 kHz), species: generic|sparrow|raptor"}
+
+# ============================================================ VEHICLE  -> sfx/recipes/vehicle.py
+veh.passby:         {kind: event, sync: peak, params: {speed_kmh: 50, closest_m: 4, direction: 1, surface: wet, ev: 0.4, height_m: 0.5},
+                     desc: "Pass-by EV con Doppler, reflejo de suelo y pan. surface: dry|wet|gravel|snow. direction 1=izq->der, -1=der->izq. sync = paso más cercano"}
+veh.approach:       {kind: event, sync: end, params: {speed_kmh: 40, start_m: 60, end_m: 5, surface: dry, ev: 0.4},
+                     desc: "Auto acercándose de frente (sin cruzar), termina cerca de cámara en `at`"}
+veh.onboard_roll:   {kind: bed, sync: start, params: {speed_kmh: 50, surface: dry, perspective: onboard},
+                     desc: "Rodado sostenido (cámara montada). perspective: onboard|close|far|interior"}
+veh.wheel_spin:     {kind: event, sync: start, params: {speed_kmh: 40, disc_whir: 0.5, darken_at: 0.5},
+                     desc: "Primer plano de rueda: rodado cercano + whir de disco + swish de llanta; darken_at (fracción) apaga brillo"}
+veh.ev_drive:       {kind: bed, sync: start, params: {speed_kmh: 50, accel: 0.0, whine: 0.5},
+                     desc: "Motor eléctrico: órdenes de motor + silbido de inversor; accel>0 sube la velocidad a lo largo de dur"}
+veh.avas_idle:      {kind: bed, sync: start, params: {level: 0.5},
+                     desc: "EV detenido/listo: AVAS muy suave (3 parciales) + zumbido eléctrico"}
+veh.wet_glide:      {kind: event, sync: peak, params: {speed_kmh: 20, sizzle: 0.6},
+                     desc: "Deslizamiento lento sobre asfalto mojado en niebla (siseo de agua, sin motor)"}
+veh.gravel_curve:   {kind: event, sync: peak, params: {speed_kmh: 25, wet: true},
+                     desc: "Curva sobre grava (granos crujientes proporcionales a velocidad)"}
+veh.snow_spray:     {kind: event, sync: transient, params: {intensity: 1.0},
+                     desc: "Rueda lanzando nieve: crunch + spray HP + partículas que caen"}
+veh.water_splash:   {kind: event, sync: transient, params: {intensity: 1.0, space: tunnel},
+                     desc: "Rueda pasando por agua: golpe de agua + nube de gotas, en espacio"}
+veh.tunnel_passby:  {kind: event, sync: peak, params: {speed_kmh: 60, wet: true},
+                     desc: "Pass-by dentro de túnel (reverb y flutter integrados)"}
+
+# ============================================================ CREATURE  -> sfx/recipes/creature.py
+cre.panda_steps:    {kind: event, sync: start, params: {steps: 4, gait_s: 0.3, surface: wet_asphalt, weight: 1.0, step_times: null},
+                     desc: "Pasos de panda (talón blando + almohadilla + tack húmedo + uñas). step_times (lista s relativos) sobreescribe steps/gait. sync = primer contacto"}
+cre.panda_breath:   {kind: event, sync: start, params: {type: exhale, close: true},
+                     desc: "Respiración de panda: exhale|sniff|huff (fuente-filtro con formantes, sin vocalización)"}
+cre.paw_on_glass:   {kind: event, sync: transient, params: {press_ms: 220, squeak: 0.4, sniff: true, inside: true},
+                     desc: "Pata contra parabrisas escuchada desde dentro: thump modal de vidrio + chirrido + roce de pelaje + olfateo"}
+cre.panda_crowd:    {kind: bed, sync: start, params: {density: 0.5, distance: mid},
+                     desc: "Presencia de muchos pandas: roces de pelaje, resoplidos lejanos, pasos sueltos"}
+cre.fur_rustle:     {kind: event, sync: start, params: {intensity: 0.5},
+                     desc: "Roce de pelaje corto"}
+cre.geese_flyover:  {kind: event, sync: start, params: {birds: 6, honks: 2, through_glass: 0.5},
+                     desc: "Bandada de gansos: aleteos (whuff + plumas) y 0-3 graznidos lejanos, opcionalmente apagados por vidrio"}
+cre.small_birds:    {kind: event, sync: start, params: {count: 3},
+                     desc: "Gorriones/pajaritos de ciudad (chirps FM 4-7 kHz)"}
+
+# ============================================================ FOLEY (objetos)  -> sfx/recipes/foley.py
+fol.phone_shutter:  {kind: event, sync: transient, params: {style: modern},
+                     desc: "Obturador de celular: 2 clics + swish (modern|soft)"}
+fol.tailgate_close: {kind: event, sync: transient, params: {motor_s: 1.0, latch: true},
+                     desc: "Portón eléctrico bajando: motor con engranajes + amortiguador + cierre (latch). sync = latch"}
+fol.gear_selector:  {kind: event, sync: transient, params: {style: rotary},
+                     desc: "Selector de marcha: detent plástico preciso (+ segundo clic suave)"}
+fol.ped_signal:     {kind: event, sync: start, params: {count: 2, rate_hz: 1.0},
+                     desc: "Tic de semáforo peatonal"}
+fol.relay_click:    {kind: event, sync: transient, params: {},
+                     desc: "Clic eléctrico de relé / encendido de faro (muy sutil)"}
+fol.light_contactor:{kind: event, sync: transient, params: {hum: 0.5},
+                     desc: "Contactor de luz de estudio grande (clack metálico) + zumbido de lámpara que decae"}
+fol.droplets:       {kind: event, sync: start, params: {rate: 6.0, surface: metal},
+                     desc: "Gotas cayendo/escurriendo sobre carrocería (metal|glass)"}
+fol.suspension:     {kind: event, sync: transient, params: {},
+                     desc: "Golpe sordo de suspensión desde la cabina"}
+fol.screen_tap:     {kind: event, sync: transient, params: {},
+                     desc: "Toque en pantalla táctil (muy suave)"}
+fol.led_fizz:       {kind: event, sync: start, params: {},
+                     desc: "Fizz eléctrico finísimo de LED encendiéndose (HP 6-12 kHz)"}
+fol.hands_wheel:    {kind: event, sync: start, params: {},
+                     desc: "Manos deslizándose sobre volante de cuero"}
+
+# ============================================================ DESIGNED (opción B sobre todo)  -> sfx/recipes/designed.py
+des.whoosh:         {kind: event, sync: peak, params: {style: air, direction: 1, peak_pos: 0.65, brightness: 0.5},
+                     desc: "Whoosh. style: air|body|tonal|spin|deep|flutter. direction 1=L->R, -1=R->L, 0=centro. sync=pico"}
+des.air_suck:       {kind: event, sync: end, params: {brightness: 0.5},
+                     desc: "Whoosh reverso que 'aspira' hacia un corte a oscuro"}
+des.sub_impact:     {kind: event, sync: transient, params: {f_start: 85, f_end: 38, decay: 1.2, body: 0.5},
+                     desc: "Impacto sub con caída de pitch + transiente blando + cuerpo; fundamental bajo el bombo (≤45 Hz)"}
+des.soft_impact:    {kind: event, sync: transient, params: {brightness: 0.5, tail: 1.0},
+                     desc: "Impacto suave sin sub (cuerpo 150-400 Hz + aire + cola de hall)"}
+des.reverse_swell:  {kind: event, sync: end, params: {source: bell, note: Bb4},
+                     desc: "Swell reverso (de campana/golpe/ruido) que termina exacto en `at`. source: bell|hit|noise"}
+des.riser:          {kind: event, sync: end, params: {start_hz: 200, end_hz: 8000, shepard: true},
+                     desc: "Riser de ruido + glissando Shepard; termina en `at`"}
+des.glint:          {kind: event, sync: transient, params: {note: F6, ratio: 3.5, decay: 1.0, sparkle: 0.5, delay: true},
+                     desc: "Brillo FM (vidrio/campana) + chispas agudas + delay a tempo (381 ms)"}
+des.led_sweep:      {kind: event, sync: start, params: {count: 10, pan_from: -0.8, pan_to: 0.8},
+                     desc: "Granos tonales ascendentes (Bb5 Db6 Eb6 F6 Ab6 Bb6...) que siguen una luz de L a R"}
+des.ev_motif:       {kind: event, sync: start, params: {gesture: swell, root: Bb2},
+                     desc: "Firma sonora EV de la marca: stack aditivo en Bb2 con batidos; gesture: swell|rise (Bb->F)|resolve"}
+des.light_shaft:    {kind: event, sync: transient, params: {},
+                     desc: "Haz de luz: barrido de ruido descendente 9->1.5 kHz + pad vítreo Bbm(add9)"}
+des.mist_texture:   {kind: bed, sync: start, params: {brightness: 0.5, drift: 0.5},
+                     desc: "Textura de niebla diseñada (ruido pintado 3-10 kHz con picos que derivan)"}
+des.drone:          {kind: bed, sync: start, params: {note: Bb1, brightness: 0.3},
+                     desc: "Dron grave/medio en la tonalidad, muy discreto"}
+des.spatial_bloom:  {kind: event, sync: transient, params: {},
+                     desc: "Pulso filtrado que florece en reverb estéreo ancha (parlante)"}
+des.logo_signature: {kind: event, sync: transient, params: {},
+                     desc: "Firma del logo: impacto suave + sub + shimmer en Bb que resuelve"}
+des.awakening:      {kind: event, sync: transient, params: {},
+                     desc: "Despertar del EX2 (remate): sub + bloom FM vítreo + gotas tonales + motivo que resuelve Bb->F"}
+des.ui_tone:        {kind: event, sync: transient, params: {note: Eb6},
+                     desc: "Tono UI suave y elegante"}
+des.breath_designed:{kind: event, sync: peak, params: {},
+                     desc: "Respiración difuminada con reverb (mítica)"}
+des.wind_swell:     {kind: event, sync: peak, params: {brightness: 0.5},
+                     desc: "Swell de viento ancho y diseñado (aéreos, montañas)"}

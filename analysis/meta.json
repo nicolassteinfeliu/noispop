@@ -1,0 +1,10 @@
+{
+ "sr": 48000,
+ "fps": 24,
+ "spf": 2000,
+ "n_frames": 1194,
+ "n_total": 2388000,
+ "audio_content_end_s": 46.616,
+ "bed_peak_dbfs": 0.0,
+ "side_to_mid_db": -14.0
+}

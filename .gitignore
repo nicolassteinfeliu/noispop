@@ -1,0 +1,16 @@
+# Material del cliente y renders: NUNCA al repo (repo público)
+media/
+out/
+analysis/*.npz
+analysis/*.npy
+*.wav
+*.aif
+*.aiff
+*.mov
+*.mp4
+*.m4a
+*.png
+*.flac
+__pycache__/
+.venv/
+tools/models/
