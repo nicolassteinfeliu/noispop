@@ -1,0 +1,328 @@
+{
+  "title": "Hites Verano 2026 Storyboard",
+  "brand": "Hites",
+  "spot": "Spot TV / digital · 30 segundos · Verano 2026",
+  "source": "Keynote resumen_story.key (anotaciones de las láminas con video)",
+  "cast": [
+    {
+      "name": "Modelo 1",
+      "desc": "pelo largo y ondulado. Abre y cierra el comercial. Escenas 1, 2, 3, 4 (estacionamiento), 5 (paso de cebra), 6 y 7."
+    },
+    {
+      "name": "Modelo 2",
+      "desc": "pelo corto tipo bob. Escenas 4 (quitasol), 5 (taco) y 7."
+    }
+  ],
+  "legend": [
+    {
+      "k": "Chasquido",
+      "v": "gatillo de los cambios de look, utilería y espacio en las escenas 1, 2, 4, 5 y 7: el cambio entra en el golpe de la música con la misma pose y el mismo encuadre o movimiento de cámara (match cut). En la escena 6 las sandalias cambian solo con la música, y el POV cemento → mar es un morph."
+    },
+    {
+      "k": "Sobreimpresos",
+      "v": "el precio va en la caja vacía dibujada en el tercio inferior de la viñeta."
+    },
+    {
+      "k": "Duraciones",
+      "v": "estimadas para un corte de 30 segundos; se ajustan con la música."
+    }
+  ],
+  "scenes": [
+    {
+      "num": 1,
+      "name": "El verano llegó",
+      "tc": "0:00 – 0:04",
+      "loc": "LOC OFF: \"El verano llegó a Hites.\"",
+      "refs": "Cabaia (teléfono y audífonos en la ciudad) · Rakuten RSVP (chasquido y cambio de vestido) · reel con grilla de planos en mosaico (ritmo de cortes)",
+      "panels": [
+        {
+          "img": "p01.jpg",
+          "shot": "Plano detalle",
+          "action": "La mano de Modelo 1 pone play a una canción en su teléfono. Ciudad de fondo, sol fuerte. Arranca la música.",
+          "fx": "La música parte aquí y marca todos los cambios del comercial.",
+          "cam": "Inserto fijo del teléfono. Corte a plano entero; desde ahí arranca el push-in hacia ella.",
+          "audio": "Entra el beat. LOC OFF: \"El verano llegó a Hites.\""
+        },
+        {
+          "img": "p02.jpg",
+          "shot": "Plano entero",
+          "action": "Modelo 1 con audífonos en la vereda, en su primer look de ciudad (el \"antes\"). Empieza a moverse con la música.",
+          "fx": "Este es el look \"antes\". Se filma con la cámara acercándose, para que el chasquido y el cambio lleguen cuando ya está encima de ella.",
+          "cam": "Push-in: la cámara se acerca al ritmo de la música (flechas).",
+          "audio": "Música sube."
+        },
+        {
+          "img": "p03.jpg",
+          "shot": "Detalle de mano",
+          "action": "Primer chasquido de dedos, exacto en el golpe de la música.",
+          "fx": "El chasquido es el gatillo. Se marca con un acento sonoro sobre el beat.",
+          "cam": "Detalle de la mano dentro del mismo push-in (la cámara sigue acercándose); rostro desenfocado detrás.",
+          "audio": "Chasquido + golpe del beat."
+        },
+        {
+          "img": "p04.jpg",
+          "shot": "Match cut antes / después",
+          "action": "Mismo encuadre, misma pose: el look de ciudad se convierte en un look de verano Hites en un solo fotograma.",
+          "fx": "Match cut en el beat sobre el mismo movimiento. El push-in se filma dos veces con el mismo lente, recorrido y velocidad (motion control o a mano); la modelo mantiene la pose, cambia el vestuario y se corta en un fotograma. Es el truco base del comercial.",
+          "cam": "Mismo push-in de la viñeta 2: la cámara sigue acercándose y el cambio entra sobre el movimiento, sin detenerla.",
+          "audio": "Golpe del beat en el corte."
+        }
+      ]
+    },
+    {
+      "num": 2,
+      "name": "Encuentra el sol",
+      "tc": "0:04 – 0:07",
+      "loc": "",
+      "refs": "Michael Kors (flare de sol) · imagen: chica contra muro con luz diagonal",
+      "panels": [
+        {
+          "img": "p05.jpg",
+          "shot": "Plano general",
+          "action": "Modelo 1 camina por una calle en sombra. Adelante, un rayo de sol entra entre los edificios y cae sobre la vereda.",
+          "fx": "La sombra alrededor y el rayo limpio adelante: el sol es el destino.",
+          "cam": "Plano general desde atrás; la cámara la sigue mientras camina hacia el rayo de sol.",
+          "audio": "Música."
+        },
+        {
+          "img": "p06.jpg",
+          "shot": "Plano medio",
+          "action": "Al encontrarse con el sol, se detiene y lo recibe en la cara, con flare. Levanta la mano para chasquear al ritmo de la música.",
+          "fx": "Flare de sol sobre el rostro. El chasquido coincide con el beat.",
+          "cam": "Medio, contraluz con flare.",
+          "audio": "Chasquido en el beat."
+        },
+        {
+          "img": "p07.jpg",
+          "shot": "Cambio de look",
+          "action": "En el chasquido cambia a un look llamativo de verano, como la referencia de la chica contra el muro: polera blanca y falda estampada con abertura, con la luz diagonal del sol.",
+          "fx": "El cambio entra en el beat. El corte va de la vereda al muro y lo cubre el flash del sol (match de luz, no de encuadre); el flare se mantiene igual antes y después para vender el corte.",
+          "cam": "Medio frontal contra el muro, cámara bloqueada.",
+          "audio": "Golpe del beat."
+        }
+      ]
+    },
+    {
+      "num": 3,
+      "name": "Distintos vestidos",
+      "tc": "0:07 – 0:11",
+      "loc": "Sobreimpreso: VESTIDOS DESDE $XX.XXX",
+      "refs": "Michael Kors (flare de sol, se sienta en la fuente) · reels con grilla de planos en mosaico (cortes rápidos al beat)",
+      "panels": [
+        {
+          "img": "p08.jpg",
+          "shot": "Montaje en mosaico",
+          "action": "Modelo 1 disfruta de los rayos de sol que entran por la ciudad, con un vestido distinto en cada rincón: escalera, fuente, calle, muro, galería de arcos, balcón.",
+          "fx": "Montaje multiplano tipo grilla, como los reels de referencia: seis planos breves que cortan rápido al beat, cada uno con un vestido distinto y su rayo de sol.",
+          "cam": "Seis encuadres verticales fijos, sol de frente.",
+          "audio": "Un corte por golpe de la música."
+        },
+        {
+          "img": "p09.jpg",
+          "shot": "Plano medio",
+          "action": "Modelo 1 sentada en el borde de una fuente, de cara al sol, con vestido largo.",
+          "fx": "Plano de respiro para que se lea el precio.",
+          "cam": "Medio, ligeramente contrapicado.",
+          "audio": "Sobreimpreso: VESTIDOS DESDE $XX.XXX (caja en el tercio inferior)."
+        }
+      ]
+    },
+    {
+      "num": 4,
+      "name": "Quitasol y ventilador",
+      "tc": "0:11 – 0:16",
+      "loc": "",
+      "refs": "TikTok (chasquido y cambio de vestido) · reel mosaico · fotos: quitasol amarillo en la vereda, quitasol rayado frente a edificio, reposera con ventilador junto al río, chica con ventilador frente a muro, piscina inflable en estacionamiento",
+      "panels": [
+        {
+          "img": "p10.jpg",
+          "shot": "Contrapicado",
+          "action": "Modelo 2 en la vereda, frente a un edificio, abre un quitasol de playa amarillo con las dos manos.",
+          "fx": "Primer look de Modelo 2 y primer quitasol (amarillo, como la foto de referencia de la vereda).",
+          "cam": "Contrapicado desde el suelo, sol de frente.",
+          "audio": "Música."
+        },
+        {
+          "img": "p11.jpg",
+          "shot": "Match cut antes / después",
+          "action": "Chasquea los dedos: cambia de look y de quitasol (del amarillo al rayado, como en la foto frente al edificio).",
+          "fx": "Match cut doble: vestuario y utilería cambian en el mismo fotograma. El quitasol se mantiene en la misma posición y altura para vender el corte.",
+          "cam": "Plano entero frontal, cámara bloqueada.",
+          "audio": "Chasquido + beat."
+        },
+        {
+          "img": "p12.jpg",
+          "shot": "Detalle a ras de piso",
+          "action": "Clava el quitasol en el cemento como si lo enterrara en la arena: el mástil entra de un solo golpe y queda firme, con arena fina levantándose alrededor.",
+          "fx": "Proceso: agujero preparado en el piso con base oculta para el mástil, disimulado con arena fina para vender que entra fácil. En post se limpia el borde del agujero y, si hace falta, se refuerza la arena.",
+          "cam": "Detalle a ras de piso, el mástil entrando de arriba hacia abajo.",
+          "audio": "Sonido de arena al hundirse."
+        },
+        {
+          "img": "p13.jpg",
+          "shot": "Corte · detalle",
+          "action": "CORTE. Un ventilador de pie se enciende: una mano aprieta el botón y las aspas arrancan.",
+          "fx": "El ventilador es el objeto que va a unir las dos locaciones.",
+          "cam": "Detalle del ventilador; la cámara empieza a girar.",
+          "audio": "Clic del ventilador, viento."
+        },
+        {
+          "img": "p14.jpg",
+          "shot": "Transición cámara 360°",
+          "action": "La cámara da una vuelta completa alrededor del ventilador y, al cerrar el giro, revela a Modelo 1 en otro sector de la ciudad: sola, tomando sol en una reposera junto al ventilador, en un estacionamiento vacío, con el viento soplándole el pelo.",
+          "fx": "Proceso: dos tomas orbitales de 360° con el ventilador en el mismo punto del encuadre (una en la locación anterior, otra en el estacionamiento); se unen cuando el ventilador cubre el cuadro. El fondo cambia, el ventilador no. Ref.: fotos de reposera con ventilador.",
+          "cam": "Orbital 360° (flecha circular) que termina en plano general.",
+          "audio": "El viento del ventilador cubre la transición."
+        }
+      ]
+    },
+    {
+      "num": 5,
+      "name": "El taco",
+      "tc": "0:16 – 0:22",
+      "loc": "Sobreimpreso: SHORTS Y POLERAS DESDE $XX.XXX",
+      "refs": "Reel Higgsfield \"Pick the move\" (personajes del auto, movimientos de cámara imposibles) · fotos: reposera en el taco y chica con flotador",
+      "panels": [
+        {
+          "img": "p15.jpg",
+          "shot": "Plano cerrado",
+          "action": "Modelo 2, con lentes de sol, toma un jugo de piña en una reposera. Vestida con onda, como en las fotos de referencia. Luz de sol dura y clara.",
+          "fx": "Plano cerrado a propósito: todavía no se ve el taco, solo un pedazo de asfalto gris.",
+          "cam": "Primer plano desde arriba; el encuadre no deja ver el taco.",
+          "audio": "Música."
+        },
+        {
+          "img": "p16.jpg",
+          "shot": "Zoom back + cambio",
+          "action": "Zoom back: el plano se abre y revela que está en medio de un taco de autos. Mientras tanto, chasquea y cambia de look.",
+          "fx": "Proceso: zoom back continuo desde el mismo plano cerrado y el mismo eje. El cambio de vestuario entra en el beat durante el movimiento (corte escondido en el zoom o reemplazo en post). El sol debe verse en contraste con el gris del taco.",
+          "cam": "Zoom back del cuadro interior al plano general (flechas hacia las esquinas).",
+          "audio": "Chasquido + beat en el cambio; al abrirse el plano entran las bocinas del taco. Sobreimpreso: SHORTS Y POLERAS DESDE $XX.XXX."
+        },
+        {
+          "img": "p17.jpg",
+          "shot": "Impossible shot · desde arriba",
+          "action": "La vemos desde arriba: cenital del taco con la reposera en medio del carril, autos por todos lados.",
+          "fx": "Toma imposible como las de la referencia de los personajes del auto, aplicada a Modelo 2 en el taco. Proceso: igual que en el reel \"Pick the move\", la cámara se genera con IA (cámara virtual) a partir del plate de Modelo 2 en la reposera dentro del taco; alternativa, dron real sobre el taco.",
+          "cam": "Cenital; la cámara baja y rota (flecha curva).",
+          "audio": "Música."
+        },
+        {
+          "img": "p18.jpg",
+          "shot": "Impossible shot · de al lado",
+          "action": "La vemos de al lado: la cámara pasa a ras de piso entre ruedas y parachoques hasta llegar a Modelo 2, de perfil en la reposera.",
+          "fx": "Segundo impossible shot de la misma referencia (cámara virtual por IA sobre el plate, mismo proceso que la viñeta anterior). Es el que nos saca del taco hacia la siguiente modelo.",
+          "cam": "Travelling lateral bajo, veloz (flecha horizontal).",
+          "audio": "Whoosh del movimiento."
+        },
+        {
+          "img": "p19.jpg",
+          "shot": "Plano general",
+          "action": "Salimos a la siguiente modelo: Modelo 1, con sandalias, cruza el paso de cebra con un flotador en las manos.",
+          "fx": "La cámara que sale del taco entra al paso de cebra con el mismo movimiento (match de movimiento / whip).",
+          "cam": "General frontal del paso de cebra.",
+          "audio": "Música; el whoosh del movimiento remata al entrar al paso de cebra. La caja del tercio inferior queda para el sobreimpreso si se prefiere correrlo hasta aquí."
+        }
+      ]
+    },
+    {
+      "num": 6,
+      "name": "Sandalias",
+      "tc": "0:21 – 0:24",
+      "loc": "Sobreimpreso: SANDALIAS DESDE $XX.XXX",
+      "refs": "Valentino Rockstud (pantalla dividida rostro / pies) · video POV piso → orilla de playa",
+      "panels": [
+        {
+          "img": "p20.jpg",
+          "shot": "Pantalla dividida",
+          "action": "Volvemos a Modelo 1 en pantalla dividida. Arriba, su rostro mientras camina; abajo, en plano detalle, sus pies con sandalias cruzando el paso de cebra. En el primer golpe de la música, las sandalias cambian en la mitad de abajo.",
+          "fx": "Pantalla dividida horizontal como en Valentino Rockstud (rostro / pies): las dos mitades avanzan al mismo paso y el primer cambio de sandalias entra en la mitad de los pies, en el beat.",
+          "cam": "Dos cámaras: primer plano del rostro y detalle de pies, a la misma velocidad.",
+          "audio": "Música."
+        },
+        {
+          "img": "p21.jpg",
+          "shot": "Planos detalle",
+          "action": "Las sandalias van cambiando al ritmo de la música en puros planos detalle de pies: un par distinto por golpe (tres pares en total, a ajustar con la música).",
+          "fx": "Proceso: cada par se filma en el mismo encuadre de pies, con la misma marca en el piso; en el montaje entra un par por beat.",
+          "cam": "Detalle de pies, cámara baja fija; la modelo ya detenida con los pies sobre la marca.",
+          "audio": "Golpe del beat en cada cambio (los íconos de chasquido marcan el ritmo; aquí el cambio va con la música). Sobreimpreso: SANDALIAS DESDE $XX.XXX."
+        },
+        {
+          "img": "p22.jpg",
+          "shot": "POV",
+          "action": "POV de Modelo 1: mira hacia abajo y ve sus pies con sandalias sobre el cemento de la calle.",
+          "fx": "Punto de vista subjetivo. Es el encuadre que se va a transformar.",
+          "cam": "Cámara a la altura de los ojos, mirando al piso.",
+          "audio": "Ciudad de fondo, música."
+        },
+        {
+          "img": "p23.jpg",
+          "shot": "POV · cemento → mar",
+          "action": "El cemento de la calle se convierte en la orilla del mar: la arena avanza y el agua llega a sus pies.",
+          "fx": "Proceso: se filma el mismo POV dos veces (calle y playa) con el mismo lente y altura, y los pies en la misma posición; se funden con una máscara que avanza como la ola. La línea punteada marca el borde del morph.",
+          "cam": "Mismo POV bloqueado.",
+          "audio": "Entra el sonido del mar sobre la música."
+        }
+      ]
+    },
+    {
+      "num": 7,
+      "name": "Azotea de arena",
+      "tc": "0:24 – 0:30",
+      "loc": "LOC OFF: \"Busca tu verano en Hites.\" (el guión escrito la marca además como sobreimpreso, SI + LOC) · Cierre: Hites. Eso que quieres, HOY.",
+      "refs": "Prada \"Urban Beaches\" (azoteas con arena, cenital de techos) · Higgsfield Genjutsu split screen (original Prada vs. personaje reemplazado) · foto: reposera en azotea (adjunta a la lámina de la escena 5)",
+      "panels": [
+        {
+          "img": "p24.jpg",
+          "shot": "Plano medio",
+          "action": "Las dos modelos salen por la puerta de acceso a la azotea de un edificio. La ciudad al fondo.",
+          "fx": "Azotea de concreto limpia, todavía sin arena.",
+          "cam": "Medio-general, leve contrapicado.",
+          "audio": "Música."
+        },
+        {
+          "img": "p25.jpg",
+          "shot": "Chasquido + arena",
+          "action": "Chasquean los dedos a la vez y, en el golpe del beat, el espacio se llena de arena: la arena cubre el concreto de la azotea en un instante.",
+          "fx": "Proceso: match cut con cámara bloqueada (azotea limpia / la misma azotea con arena real o extendida en post, modelos en la misma pose) y, como acento, unos fotogramas de arena entrando como marea en post (partículas).",
+          "cam": "Plano general bloqueado de la azotea con las manos de las dos en primer plano; mismo encuadre antes y después del chasquido.",
+          "audio": "Chasquido simultáneo de las dos (un solo acento sonoro) + golpe del beat."
+        },
+        {
+          "img": "p26.jpg",
+          "shot": "Plano general",
+          "action": "Modelo 1 y Modelo 2 disfrutan del sol en la azotea convertida en playa: toalla, quitasol, arena y los edificios alrededor (foto de referencia: reposera en azotea).",
+          "fx": "La azotea es una playa entre edificios.",
+          "cam": "General, sol de frente.",
+          "audio": "Música."
+        },
+        {
+          "img": "p27.jpg",
+          "shot": "Picado · cámara sube",
+          "action": "Modelo 1 (la modelo principal) recostada en la arena; Modelo 2 queda fuera de cuadro. La cámara empieza a subir.",
+          "fx": "Arranque del plano cenital que sale hacia arriba.",
+          "cam": "Picado que se eleva en vertical (flecha hacia arriba).",
+          "audio": "Música baja para la LOC."
+        },
+        {
+          "img": "p28.jpg",
+          "shot": "Cenital final",
+          "action": "El cenital sigue subiendo hasta ver toda la ciudad: la azotea es un cuadrado de arena blanca entre techos grises, con Modelo 1 como un punto en el centro.",
+          "fx": "Proceso: dron o cámara virtual subiendo en vertical; la ciudad y la azotea de arena se extienden en post. Camino alternativo según la referencia Genjutsu (split screen: original Prada vs. personaje reemplazado): tomar un plate tipo \"Urban Beaches\" y reemplazar al personaje por Modelo 1 con IA, sea para el previs o para el plano final, a definir con el cliente.",
+          "cam": "Cenital alto, subiendo.",
+          "audio": "LOC OFF: \"Busca tu verano en Hites.\""
+        },
+        {
+          "img": "p29.jpg",
+          "shot": "Cierre",
+          "endcard": true,
+          "action": "Tarjeta de cierre con el logo y el claim.",
+          "fx": "Logo Hites + \"Eso que quieres, HOY.\"",
+          "cam": "Fija.",
+          "audio": "Cierre musical (últimos 2 segundos)."
+        }
+      ]
+    }
+  ]
+}

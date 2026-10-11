@@ -75,8 +75,18 @@ Produce `index.html` (cuerpo para el Artifact), `print.html` y `storyboard.pdf` 
 por página, una escena por página). Revisa el PDF con `pdftoppm -r 40` y una hoja de miniaturas.
 
 Verificación: si el entorno tiene el tool Workflow (o subagentes), lanza revisores por escena que
-intenten refutar la fidelidad de `data.json` contra `annotations.md` más un revisor de idioma; aplica
-los findings de severidad alta/media antes de publicar.
+intenten refutar la fidelidad de `data.json` contra `annotations.md` más un revisor de idioma y un
+crítico de completitud; aplica los findings de severidad alta/media antes de publicar. En el primer uso
+la revisión encontró, sobre todo, estas fallas (evítalas al escribir):
+- vestuario, utilería o ángulos inventados que ni las notas ni las fotos de la lámina mencionan
+  (describe lo que está en la nota o en la foto de referencia; si el dibujo agrega algo, dilo como dibujo);
+- el "antes" y el "después" de un cambio descritos con encuadres o movimientos distintos (si la nota
+  dice push-in continuo, el match cut va sobre el mismo movimiento, no con cámara bloqueada);
+- sobreimpresos puestos en otra viñeta de la que el guión indica;
+- nombres inconsistentes (Modelo 1 / Modelo 2 siempre; "chica" solo para las fotos de referencia);
+- frases de más de 35 palabras en una viñeta, concordancia (cada par… se filma) y comas antes de "o".
+`references/example-hites-data.json` y `example-hites-annotations.md` muestran el tono y el nivel de
+detalle que quedó aprobado por esa revisión.
 
 Entrega: publica el Artifact (`file_path: index.html`, `files` con `panels/*.jpg`, `icon: "film"`),
 manda `storyboard.pdf` con SendUserFile, y resume en 10 líneas: láminas por escena, efectos
