@@ -1,0 +1,17 @@
+{
+  "skill_name": "keynote-storyboard",
+  "evals": [
+    {"id": 1,
+     "prompt": "Te subí el Keynote de la campaña de invierno (invierno_story.key). Léete las notas y mira los videos de referencia y hazme un storyboard dibujado en blanco y negro, máximo 24 láminas, para mostrarle al cliente antes de filmar.",
+     "expected_output": "report.md con orden de láminas, notas y hojas de contacto; ≤24 viñetas B/N generadas en Higgsfield con el prefijo de estilo; data.json; index.html publicado como Artifact + storyboard.pdf entregado.",
+     "files": ["invierno_story.key"]},
+    {"id": 2,
+     "prompt": "abre este .key, hay 5 escenas con videos de referencia y mis anotaciones. quiero el storyboard tipo dibujante, en b/n, que resuma los efectos como los describo en cada lámina (no en el guión general).",
+     "expected_output": "Las anotaciones por lámina mandan sobre el guión; cada efecto se sintetiza con un recurso de storyboard (antes/después, cuadro en cuadro, flechas); entrega PDF + página.",
+     "files": ["campaña.key"]},
+    {"id": 3,
+     "prompt": "Necesito actualizar el storyboard de Hites: cambié la escena 4 en el Keynote (ahora la modelo abre el quitasol en una plaza). Regenera solo esas viñetas y vuelve a armar el PDF.",
+     "expected_output": "Re-extrae el Keynote, regenera solo las viñetas de la escena 4 con el mismo estilo, actualiza data.json, reconstruye index.html/PDF y republica el mismo Artifact (misma URL).",
+     "files": ["resumen_story.key"]}
+  ]
+}
