@@ -178,3 +178,64 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# ---------- Classic storyboard: 6 panels per landscape page ----------
+CLASSIC_CSS = r"""
+:root{--ink:#111;--soft:#555;--line:#999;--accent:#0b5fa5;--display:"Oswald","Arial Narrow",sans-serif;--body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif}
+*{box-sizing:border-box}body{margin:0;font-family:var(--body);color:var(--ink);background:#fff;font-size:10.5px;line-height:1.35}
+@page{size:A4 landscape;margin:8mm}
+.page{width:281mm;height:194mm;padding:4mm 4mm 0;display:flex;flex-direction:column;break-after:page;page-break-after:always;margin:0 auto}
+.page:last-child{break-after:auto;page-break-after:auto}
+.head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1.5px solid var(--ink);padding-bottom:2mm;margin-bottom:3mm;font-family:var(--display);text-transform:uppercase;letter-spacing:.08em}
+.head .t{font-size:16px}.head .s{font-size:10px;color:var(--soft)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:4mm 5mm;flex:1;min-height:0}
+.cell{display:flex;flex-direction:column;min-height:0}
+.fr{position:relative;aspect-ratio:16/9;width:100%;border:1.2px solid var(--ink);overflow:hidden;background:#fff}
+.fr img{width:100%;height:100%;object-fit:cover;display:block}
+.fr .n{position:absolute;left:0;top:0;background:var(--ink);color:#fff;font-family:var(--display);font-size:11px;padding:1px 6px}
+.fr .sh{position:absolute;right:0;bottom:0;background:var(--accent);color:#fff;font-family:var(--display);font-size:8.5px;text-transform:uppercase;letter-spacing:.06em;padding:1px 6px}
+.endcard{position:absolute;left:30.5%;top:31%;width:39%;height:31%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#111;text-align:center}
+.endcard .logo{font-weight:700;font-size:20px;letter-spacing:-.02em;line-height:1}.endcard .claim{font-family:var(--display);font-size:8px;text-transform:uppercase;letter-spacing:.1em}
+.cap{padding-top:1.5mm;display:grid;grid-template-columns:1fr;gap:2px;overflow:hidden}
+.cap .sc{font-family:var(--display);text-transform:uppercase;letter-spacing:.08em;font-size:8.5px;color:var(--accent)}
+.cap .a{font-size:10.5px}.cap .d{font-size:10px;color:var(--soft);border-top:1px dashed var(--line);padding-top:2px}
+.foot{font-size:8.5px;color:var(--soft);padding:2mm 0;text-align:right;font-family:var(--display);letter-spacing:.08em;text-transform:uppercase}
+"""
+
+def render_classic(data):
+    items = []
+    n = 0
+    for sc in data["scenes"]:
+        for p in sc["panels"]:
+            n += 1; items.append((n, sc, p))
+    pages = [items[i:i+6] for i in range(0, len(items), 6)]
+    s = ['<!doctype html><html lang="es"><head><meta charset="utf-8">', f'<title>{esc(data["title"])} · clásico</title>',
+         '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500&family=IBM+Plex+Sans:wght@400;600&display=swap">',
+         f'<style>{CLASSIC_CSS}</style></head><body>']
+    for k, pg in enumerate(pages, 1):
+        s.append('<section class="page"><div class="head">')
+        s.append(f'<span class="t">{esc(data["title"])}</span><span class="s">{esc(data["spot"])} · página {k}/{len(pages)}</span></div><div class="grid">')
+        for n, sc, p in pg:
+            s.append('<div class="cell"><div class="fr">')
+            s.append(f'<img src="panels/{esc(p["img"])}" alt=""><span class="n">{n:02d}</span><span class="sh">{esc(p["shot"])}</span>')
+            if p.get("endcard"):
+                s.append(f'<div class="endcard"><div class="logo">{esc(data["brand"].lower())}</div><div class="claim">Eso que quieres, hoy.</div></div>')
+            s.append('</div><div class="cap">')
+            s.append(f'<span class="sc">Esc. {sc["num"]} · {esc(sc["name"])} · {esc(sc.get("tc",""))}</span>')
+            s.append(f'<span class="a">{esc(p["action"])}</span>')
+            s.append(f'<span class="d">{esc(p["audio"])}</span></div></div>')
+        s.append('</div><div class="foot">Storyboard · blanco y negro · previsualización</div></section>')
+    s.append('</body></html>')
+    return '\n'.join(s)
+
+if __name__ == '__main__' and '--classic' in sys.argv:
+    d = sys.argv[1]
+    data = json.load(open(os.path.join(d, 'data.json'), encoding='utf-8'))
+    open(os.path.join(d, 'classic.html'), 'w', encoding='utf-8').write(render_classic(data))
+    import glob
+    g = glob.glob('/opt/pw-browsers/chromium*/chrome-linux*/chrome')
+    if g:
+        out = os.path.join(d, 'storyboard_clasico.pdf')
+        subprocess.run([g[0], '--headless=new', '--no-sandbox', '--disable-gpu', '--virtual-time-budget=20000', '--no-pdf-header-footer',
+                        f'--print-to-pdf={out}', 'file://' + os.path.abspath(os.path.join(d, 'classic.html'))], check=True, timeout=180, capture_output=True)
+        print('wrote', out)

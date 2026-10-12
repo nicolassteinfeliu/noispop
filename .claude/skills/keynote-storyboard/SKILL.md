@@ -73,6 +73,21 @@ python3 -I <skill>/scripts/build_storyboard.py <dir> --pdf
 
 Produce `index.html` (cuerpo para el Artifact), `print.html` y `storyboard.pdf` (A4 vertical, 4 viñetas
 por página, una escena por página). Revisa el PDF con `pdftoppm -r 40` y una hoja de miniaturas.
+Formatos adicionales que el cliente pidió en el segundo uso (entrégalos si los pide, o si es un spot
+narrativo con diálogos):
+- `python3 -I <skill>/scripts/build_storyboard.py <dir> --classic` → `storyboard_clasico.pdf`, A4 apaisado,
+  6 viñetas por página (3×2) con número, plano, escena, una línea de acción y el diálogo.
+- `node <skill>/scripts/make_pptx.js <dir> <salida.pptx>` → PowerPoint 16:9 en el formato de referencia del
+  cliente: fondo azul oscuro (`assets/bg_blue.jpg`), grilla 4×3 de cuadros 16:9, indicación corta arriba de
+  cada cuadro y diálogo/LOC abajo en negrita, 12 viñetas por lámina. `data.deck_title` fija el título de la
+  lámina (p. ej. "JAMES BOND - CINE"). Requiere `pptxgenjs` (`npm install pptxgenjs` si falta); validar con
+  el `validate.py` de la skill pptx y revisar el render para que la tercera fila no se corte.
+
+Lecciones del segundo uso (spot narrativo con humor, Hites Tarjeta): no uses pantalla partida para una
+transformación que ocurre en cámara por VFX; dibújala en un solo cuadro con el efecto recorriendo al
+personaje, y cuéntala en dos escalas (un detalle muy cerrado y un plano abierto). Varía la escala de
+planos a lo largo del storyboard. En humor, el diálogo va en el campo `audio` y el remate del chiste
+merece su propia viñeta de reacción.
 
 Verificación: si el entorno tiene el tool Workflow (o subagentes), lanza revisores por escena que
 intenten refutar la fidelidad de `data.json` contra `annotations.md` más un revisor de idioma y un
