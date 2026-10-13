@@ -1,0 +1,109 @@
+---
+name: keynote-storyboard
+description: Convierte un Keynote (.key) de guión con notas, fotos y videos de referencia en un storyboard dibujado en blanco y negro (estilo dibujante de storyboard, lápiz y tinta) de hasta 30 láminas, listo para mostrar a un publicista o cliente antes de filmar, entregado como página (Artifact) y PDF. Usa esta skill siempre que el usuario suba o mencione un archivo .key / Keynote / "guión" / "resumen story" y pida storyboard, viñetas, láminas, "dibujos de las escenas", previsualización, o quiera "ver la historia antes de filmar"; también cuando pida regenerar o actualizar un storyboard ya hecho con esta skill, aunque no diga la palabra storyboard. Requiere Higgsfield (generate_image_batch, sandbox_exec) y Python 3 con Pillow; ffmpeg para ver los videos.
+---
+
+# Keynote → storyboard en blanco y negro
+
+El flujo completo se hizo por primera vez para el spot "Hites Verano 2026" y quedó en
+`storyboard/` de aquella sesión; los scripts de esta skill son la versión reutilizable.
+La idea es que el usuario suba el `.key`, se vaya, y vuelva a encontrar el PDF y el link.
+Por eso: no hagas preguntas que bloqueen. Toma decisiones razonables, dilas al final.
+
+## 1. Leer el Keynote completo (notas + videos + fotos)
+
+```bash
+python3 -I <skill>/scripts/keynote_extract.py <archivo.key> <scratchpad>/key
+```
+
+Escribe `report.md` con el orden real de las láminas, el texto y las notas de cada una, y qué
+videos/fotos usa cada lámina, más `sheets/`: una hoja de contacto de 12 fotogramas por video
+(`slideNN_video_<id>.jpg`) y una hoja de miniaturas de las fotos de cada lámina (`slideNN_images.jpg`).
+Lee el reporte y mira TODAS las hojas (con Read, varias por llamada). Los videos son la referencia
+visual de cada efecto; sin verlos, el storyboard se inventa el efecto.
+
+Por qué un script propio: `.key` es un zip con objetos protobuf comprimidos con snappy; `iwa.py` los
+descomprime en Python puro, sin dependencias. El orden de láminas sale de `Document.iwa`, y la
+relación lámina→archivo se deduce de los ids numéricos en los nombres de `Data/`.
+
+## 2. Decidir qué manda
+
+Los guiones suelen tener una lámina "guión madre" (el texto general) y luego láminas por escena con
+videos y una anotación más específica. **La anotación de la lámina con video manda sobre el guión
+escrito** cuando se contradicen (el usuario lo pidió explícitamente en el primer uso: "la cámara se
+acerca" en la nota vs. "se aleja" en el guión). Guarda las anotaciones en `annotations.md` tal cual,
+con una nota de prioridad, para poder verificar después.
+
+## 3. Planificar las láminas (≤ 30, normalmente 25-29)
+
+Una lámina por beat o por efecto; el límite es del usuario, respétalo contando también la tarjeta de
+cierre. Cada efecto se sintetiza con un recurso de storyboard clásico (antes/después partido por un
+rayo, cuadro dentro del cuadro para un zoom back, flecha circular para un 360°, mosaico para un
+montaje, pantalla dividida, mitad y mitad con línea punteada para un morph). La lista completa de
+recursos y el prefijo de estilo están en `references/style-prompt.md`; léelo antes de escribir prompts.
+
+Fija los personajes con un rasgo visual repetido en todos los prompts (pelo largo ondulado / bob corto)
+y escribe los prompts en inglés (el modelo dibuja mejor) pidiendo siempre "no text". Los
+sobreimpresos de precio y el logo nunca van en la imagen: se piden como caja vacía y el texto se pone
+en el HTML.
+
+## 4. Generar en Higgsfield
+
+`generate_image_batch` con `gpt_image_2_5`, `16:9`, 12 por llamada, varias llamadas en el mismo turno;
+luego `jobs_wait` por grupo. Preflight de costo con `generate_image` + `get_cost: true`
+(≈0,25 créditos por viñeta) y revisa `balance` antes de gastar. Después `show_generation_by_ids` una
+sola vez con todos los jobs.
+
+## 5. Traer las imágenes y revisarlas
+
+El CDN de resultados suele estar bloqueado por la red del entorno. El puente que funciona está en
+`references/transfer-from-higgsfield.md` (descargar en el sandbox de Higgsfield, convertir a JPEG gris
+1280 px, devolverlas con `image_paths` de a 2, copiarlas desde `tool-results/`). Al verlas, comprueba:
+blanco y negro, sin texto, personaje correcto, recurso de storyboard presente. Rehaz solo las fallidas.
+
+## 6. Escribir los textos y armar la entrega
+
+Escribe `data.json` (esquema en `references/data-schema.md`): por viñeta, acción, **efecto/proceso tal
+como lo describen las notas**, cámara y audio/sobreimpreso; por escena, nombre, timecode estimado,
+LOC y referencias. Español neutro-chileno si el cliente escribe así (reposera, quitasol, taco, polera).
+
+```bash
+python3 -I <skill>/scripts/build_storyboard.py <dir> --pdf
+```
+
+Produce `index.html` (cuerpo para el Artifact), `print.html` y `storyboard.pdf` (A4 vertical, 4 viñetas
+por página, una escena por página). Revisa el PDF con `pdftoppm -r 40` y una hoja de miniaturas.
+Formatos adicionales que el cliente pidió en el segundo uso (entrégalos si los pide, o si es un spot
+narrativo con diálogos):
+- `python3 -I <skill>/scripts/build_storyboard.py <dir> --classic` → `storyboard_clasico.pdf`, A4 apaisado,
+  6 viñetas por página (3×2) con número, plano, escena, una línea de acción y el diálogo.
+- `node <skill>/scripts/make_pptx.js <dir> <salida.pptx>` → PowerPoint 16:9 en el formato de referencia del
+  cliente: fondo azul oscuro (`assets/bg_blue.jpg`), grilla 4×3 de cuadros 16:9, indicación corta arriba de
+  cada cuadro y diálogo/LOC abajo en negrita, 12 viñetas por lámina. `data.deck_title` fija el título de la
+  lámina (p. ej. "JAMES BOND - CINE"). Requiere `pptxgenjs` (`npm install pptxgenjs` si falta); validar con
+  el `validate.py` de la skill pptx y revisar el render para que la tercera fila no se corte.
+
+Lecciones del segundo uso (spot narrativo con humor, Hites Tarjeta): no uses pantalla partida para una
+transformación que ocurre en cámara por VFX; dibújala en un solo cuadro con el efecto recorriendo al
+personaje, y cuéntala en dos escalas (un detalle muy cerrado y un plano abierto). Varía la escala de
+planos a lo largo del storyboard. En humor, el diálogo va en el campo `audio` y el remate del chiste
+merece su propia viñeta de reacción.
+
+Verificación: si el entorno tiene el tool Workflow (o subagentes), lanza revisores por escena que
+intenten refutar la fidelidad de `data.json` contra `annotations.md` más un revisor de idioma y un
+crítico de completitud; aplica los findings de severidad alta/media antes de publicar. En el primer uso
+la revisión encontró, sobre todo, estas fallas (evítalas al escribir):
+- vestuario, utilería o ángulos inventados que ni las notas ni las fotos de la lámina mencionan
+  (describe lo que está en la nota o en la foto de referencia; si el dibujo agrega algo, dilo como dibujo);
+- el "antes" y el "después" de un cambio descritos con encuadres o movimientos distintos (si la nota
+  dice push-in continuo, el match cut va sobre el mismo movimiento, no con cámara bloqueada);
+- sobreimpresos puestos en otra viñeta de la que el guión indica;
+- nombres inconsistentes (Modelo 1 / Modelo 2 siempre; "chica" solo para las fotos de referencia);
+- frases de más de 35 palabras en una viñeta, concordancia (cada par… se filma) y comas antes de "o".
+`references/example-hites-data.json` y `example-hites-annotations.md` muestran el tono y el nivel de
+detalle que quedó aprobado por esa revisión.
+
+Entrega: publica el Artifact (`file_path: index.html`, `files` con `panels/*.jpg`, `icon: "film"`),
+manda `storyboard.pdf` con SendUserFile, y resume en 10 líneas: láminas por escena, efectos
+sintetizados, decisiones tomadas y créditos gastados. Si el usuario pide cambios en una escena,
+regenera solo esas viñetas, actualiza `data.json` y republica el mismo Artifact (misma `url`).
